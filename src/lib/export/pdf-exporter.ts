@@ -311,7 +311,7 @@ function manuscriptHeadingContent(
 	typography: BookTypographyStyle,
 	pageBreak: 'before' | undefined
 ): ContentStack {
-	const heading = typesetDocumentHeading(workspace.documents, document);
+	const heading = typesetDocumentHeading(workspace.project, workspace.documents, document);
 	const page = BOOK_PAGE_METRICS[workspace.project.trimSize];
 	const stack: Content[] = [];
 	if (heading.label) {
@@ -321,13 +321,15 @@ function manuscriptHeadingContent(
 			alignment: 'center'
 		});
 	}
-	stack.push({
-		text: heading.title,
-		style: 'documentTitle',
-		alignment: 'center',
-		outline: true,
-		outlineText: heading.title
-	});
+	if (heading.title) {
+		stack.push({
+			text: heading.title,
+			style: 'documentTitle',
+			alignment: 'center',
+			outline: true,
+			outlineText: heading.title
+		});
+	}
 
 	return {
 		stack,
@@ -335,9 +337,11 @@ function manuscriptHeadingContent(
 		unbreakable: true,
 		margin: [
 			0,
-			Math.max(0, page.height * BOOK_LAYOUT.documentHeadingTopRatio - page.marginBlock),
+			stack.length > 0
+				? Math.max(0, page.height * BOOK_LAYOUT.documentHeadingTopRatio - page.marginBlock)
+				: 0,
 			0,
-			typography.bodyFontSizePt * BOOK_LAYOUT.documentHeadingGapEm
+			stack.length > 0 ? typography.bodyFontSizePt * BOOK_LAYOUT.documentHeadingGapEm : 0
 		]
 	};
 }

@@ -284,6 +284,51 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	expect((await epubDownload).suggestedFilename()).toBe('exportable-story.epub');
 });
 
+test('uses book-wide chapter headings with persistent per-chapter overrides in the editor and PDF', async ({
+	page
+}) => {
+	await createNovel(page, 'Heading Workshop');
+	await page.getByLabel('Page title').fill('The Threshold');
+	await page.getByLabel('Page title').press('Enter');
+
+	await page.getByRole('button', { name: 'Book settings' }).click();
+	await page.getByLabel('Chapter label text').fill('Scene {number}');
+	await page.getByRole('checkbox', { name: /Chapter title/ }).uncheck();
+	await expect(page.getByLabel('Chapter heading preview')).toContainText('Scene 1');
+	await page.getByRole('button', { name: 'Save book settings' }).click();
+	await expect(page.getByLabel('Typeset page heading')).toContainText('Scene 1');
+	await expect(page.getByLabel('Typeset page heading')).not.toContainText('The Threshold');
+
+	await page.getByRole('button', { name: 'Insert chapter after The Threshold' }).click();
+	await page.getByRole('button', { name: 'Chapter heading' }).click();
+	await page.getByRole('checkbox', { name: /Use book-wide heading style/ }).uncheck();
+	await page.getByRole('checkbox', { name: /Automatic chapter label/ }).uncheck();
+	await page.getByRole('button', { name: 'Save chapter heading' }).click();
+	await expect(page.getByLabel('Typeset page heading')).toHaveCount(0);
+
+	await page.reload();
+	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 2');
+	await expect(page.getByLabel('Typeset page heading')).toHaveCount(0);
+	await page.getByRole('button', { name: /1 The Threshold/ }).click();
+	await expect(page.getByLabel('Typeset page heading')).toContainText('Scene 1');
+
+	await page.getByText('Export', { exact: true }).click();
+	const pdfDownload = page.waitForEvent('download');
+	await page.getByRole('button', { name: /PDF/ }).click();
+	const pdfPath = await (await pdfDownload).path();
+	if (!pdfPath) throw new Error('The heading PDF was not available for verification.');
+	const extracted = await extractTextItems(new Uint8Array(await readFile(pdfPath)));
+	const pdfText = extracted.items
+		.flat()
+		.map((item) => item.str)
+		.join(' ')
+		.replaceAll(' ', '');
+	expect(pdfText).toContain('SCENE1');
+	expect(pdfText).not.toContain('CHAPTER1');
+	expect(pdfText).not.toContain('CHAPTER2');
+	expect(pdfText).not.toContain('TheThreshold');
+});
+
 test('configures book pages, raster and SVG covers, and positioned resizable artwork', async ({
 	page
 }) => {

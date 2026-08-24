@@ -3,8 +3,10 @@
 	import { untrack } from 'svelte';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import { MEDIA_ACCEPT_ATTRIBUTE } from '$lib/application/media-service';
-	import type { TrimSize, TypographyPreset } from '$lib/domain/types';
+	import { bookChapterHeading } from '$lib/domain/chapter-headings';
+	import type { ChapterHeadingSettings, TrimSize, TypographyPreset } from '$lib/domain/types';
 	import Modal from '$lib/components/ui/Modal.svelte';
+	import ChapterHeadingBuilder from './ChapterHeadingBuilder.svelte';
 
 	let { model }: { model: WriteANovelState } = $props();
 	const project = untrack(() => model.workspace!.project);
@@ -14,6 +16,7 @@
 	let synopsis = $state(project.synopsis);
 	let trimSize = $state<TrimSize>(project.trimSize);
 	let typography = $state<TypographyPreset>(project.typography);
+	let chapterHeading = $state<ChapterHeadingSettings>({ ...bookChapterHeading(project) });
 	let savingCover = $state<'front' | 'back'>();
 
 	function coverUrl(side: 'front' | 'back'): string | undefined {
@@ -40,7 +43,15 @@
 	}
 
 	async function save(): Promise<void> {
-		await model.updateBookSettings({ title, subtitle, author, synopsis, trimSize, typography });
+		await model.updateBookSettings({
+			title,
+			subtitle,
+			author,
+			synopsis,
+			trimSize,
+			typography,
+			chapterHeading: { ...chapterHeading }
+		});
 	}
 
 	function deleteBook(): void {
@@ -87,6 +98,18 @@
 						<option value="modern">Modern — clean sans serif</option>
 					</select>
 				</label>
+			</div>
+			<div class="heading-settings">
+				<div>
+					<h3>Chapter heading defaults</h3>
+					<p>Applied to every chapter unless that chapter has its own override.</p>
+				</div>
+				<ChapterHeadingBuilder
+					value={chapterHeading}
+					chapterNumber={1}
+					chapterTitle="The Lantern Room"
+					onChange={(value) => (chapterHeading = value)}
+				/>
 			</div>
 			<button class="button button-primary save" type="button" onclick={save}
 				>Save book settings</button
@@ -170,6 +193,24 @@
 	.save {
 		justify-self: start;
 		margin-top: 0.25rem;
+	}
+
+	.heading-settings {
+		display: grid;
+		gap: 0.8rem;
+		margin-top: 0.4rem;
+		padding-top: 1.15rem;
+		border-top: 1px solid var(--line);
+	}
+
+	.heading-settings h3 {
+		margin-bottom: 0.25rem;
+	}
+
+	.heading-settings p {
+		margin: 0;
+		color: var(--ink-soft);
+		font-size: 0.74rem;
 	}
 
 	.covers > p {

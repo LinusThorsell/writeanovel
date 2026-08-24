@@ -3,6 +3,7 @@ import { documentsOfKind } from '$lib/domain/ordering';
 import type { ManuscriptDocument, MediaAsset, WorkspaceSnapshot } from '$lib/domain/types';
 import { downloadBlob, safeFileName } from './download';
 import { richTextToHtml } from './rich-text-html';
+import { typesetDocumentHeading, type TypesetDocumentHeading } from '$lib/typesetting/book-style';
 
 function escapeXml(value: string): string {
 	return value
@@ -36,7 +37,14 @@ function orderedDocuments(workspace: WorkspaceSnapshot): ManuscriptDocument[] {
 	];
 }
 
-function xhtmlDocument(title: string, body: string): string {
+function headingMarkup(heading: TypesetDocumentHeading): string {
+	return [
+		heading.label ? `<p class="chapter-label">${escapeXml(heading.label)}</p>` : '',
+		heading.title ? `<h1>${escapeXml(heading.title)}</h1>` : ''
+	].join('');
+}
+
+function xhtmlDocument(title: string, heading: TypesetDocumentHeading, body: string): string {
 	return `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -47,7 +55,7 @@ function xhtmlDocument(title: string, body: string): string {
 </head>
 <body>
   <main>
-    <h1>${escapeXml(title)}</h1>
+    ${headingMarkup(heading)}
     ${body}
   </main>
 </body>
@@ -69,6 +77,8 @@ html { color: #171a18; background: #fff; }
 body { font-family: "Libre Baskerville", Georgia, serif; line-height: 1.55; hyphens: auto; }
 main { max-width: 36em; margin: 0 auto; }
 h1 { margin: 18vh 0 3rem; text-align: center; font-size: 1.6em; font-weight: normal; letter-spacing: .04em; }
+.chapter-label { margin: 18vh 0 .85em; text-align: center; text-indent: 0; font-size: .78em; font-weight: bold; letter-spacing: .12em; text-transform: uppercase; }
+.chapter-label + h1 { margin-top: 0; }
 h2, h3 { margin-top: 2em; }
 p { margin: 0; text-indent: 1.4em; orphans: 2; widows: 2; }
 h1 + p, h2 + p, h3 + p, blockquote p, li p { text-indent: 0; }
@@ -106,7 +116,11 @@ export async function buildEpub(workspace: WorkspaceSnapshot): Promise<Blob> {
 		);
 		zip.file(
 			`OEBPS/text/${manuscriptDocument.id}.xhtml`,
-			xhtmlDocument(manuscriptDocument.title, html)
+			xhtmlDocument(
+				manuscriptDocument.title,
+				typesetDocumentHeading(workspace.project, workspace.documents, manuscriptDocument),
+				html
+			)
 		);
 	}
 

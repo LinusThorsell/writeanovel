@@ -44,6 +44,9 @@ describe('EPUB export', () => {
 		expect(await archive.file('OEBPS/text/chapter-1.xhtml')?.async('string')).toContain(
 			'Once upon a test.'
 		);
+		const chapter = await archive.file('OEBPS/text/chapter-1.xhtml')?.async('string');
+		expect(chapter).toContain('<p class="chapter-label">Chapter 1</p>');
+		expect(chapter).toContain('<h1>A Beginning</h1>');
 		expect(await archive.file('OEBPS/content.opf')?.async('string')).toContain('The Test Book');
 	});
 });

@@ -32,6 +32,12 @@ export type TrimSize = 'trade-6x9' | 'a5' | 'letter';
 export type TypographyPreset = 'literary' | 'classic' | 'modern';
 export type LibraryEntityType = 'project' | 'document' | 'note' | 'asset';
 
+export type ChapterHeadingSettings = {
+	showLabel: boolean;
+	labelTemplate: string;
+	showTitle: boolean;
+};
+
 export type NovelProject = {
 	id: string;
 	title: string;
@@ -40,6 +46,7 @@ export type NovelProject = {
 	synopsis: string;
 	trimSize: TrimSize;
 	typography: TypographyPreset;
+	chapterHeading?: ChapterHeadingSettings;
 	frontCoverAssetId?: string;
 	backCoverAssetId?: string;
 	createdAt: string;
@@ -54,6 +61,7 @@ export type ManuscriptDocument = {
 	title: string;
 	position: number;
 	body: RichTextNode;
+	chapterHeadingOverride?: ChapterHeadingSettings;
 	createdAt: string;
 	updatedAt: string;
 };

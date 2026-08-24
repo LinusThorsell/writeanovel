@@ -1,16 +1,30 @@
 <script lang="ts">
-	import { ArrowDown, ArrowUp, Cloud, CloudOff, HardDrive, Trash2 } from '@lucide/svelte';
+	import {
+		ArrowDown,
+		ArrowUp,
+		Cloud,
+		CloudOff,
+		HardDrive,
+		Settings2,
+		Trash2
+	} from '@lucide/svelte';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import { preserveEditorScrollPosition } from '$lib/application/editor-scroll-position';
 	import type { SyncStatus } from '$lib/domain/types';
 	import { richTextToPlainText } from '$lib/export/rich-text-html';
 	import RichTextEditor from '$lib/components/editor/RichTextEditor.svelte';
+	import ChapterHeadingModal from '$lib/components/settings/ChapterHeadingModal.svelte';
 	import { typesetDocumentHeading, type TypesetDocumentHeading } from '$lib/typesetting/book-style';
 
 	let { model }: { model: WriteANovelState } = $props();
+	let chapterHeadingOpen = $state(false);
 	const typesetHeading: TypesetDocumentHeading | undefined = $derived.by(() => {
 		if (!model.workspace || !model.activeDocument) return undefined;
-		return typesetDocumentHeading(model.workspace.documents, model.activeDocument);
+		return typesetDocumentHeading(
+			model.workspace.project,
+			model.workspace.documents,
+			model.activeDocument
+		);
 	});
 
 	function commitTitle(event: FocusEvent): void {
@@ -76,6 +90,11 @@
 				/>
 			</div>
 			<div class="item-actions">
+				{#if model.activeDocument?.kind === 'chapter'}
+					<button class="heading-button" type="button" onclick={() => (chapterHeadingOpen = true)}
+						><Settings2 size={16} />Chapter heading</button
+					>
+				{/if}
 				{#if model.activeDocument}
 					<button
 						class="icon-button"
@@ -172,6 +191,16 @@
 	{/if}
 </main>
 
+{#if chapterHeadingOpen && model.workspace && model.activeDocument?.kind === 'chapter'}
+	<ChapterHeadingModal
+		project={model.workspace.project}
+		document={model.activeDocument}
+		chapterNumber={model.chapterNumber(model.activeDocument.id) ?? 1}
+		onSave={(value) => model.updateChapterHeadingOverride(model.activeDocument!.id, value)}
+		onClose={() => (chapterHeadingOpen = false)}
+	/>
+{/if}
+
 <style>
 	main {
 		position: relative;
@@ -221,6 +250,25 @@
 		display: flex;
 		align-items: center;
 		gap: 0.15rem;
+	}
+
+	.heading-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		min-height: 2.15rem;
+		margin-right: 0.35rem;
+		padding: 0.4rem 0.65rem;
+		color: var(--ink-soft);
+		background: transparent;
+		border: 1px solid var(--line);
+		border-radius: 0.45rem;
+		font-size: 0.74rem;
+	}
+
+	.heading-button:hover {
+		color: var(--forest-deep);
+		background: rgb(39 72 59 / 7%);
 	}
 
 	.delete:hover {

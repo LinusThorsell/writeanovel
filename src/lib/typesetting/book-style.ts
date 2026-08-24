@@ -1,7 +1,9 @@
 import { chapterNumber } from '$lib/domain/ordering';
+import { chapterLabel, documentChapterHeading } from '$lib/domain/chapter-headings';
 import type {
 	DocumentKind,
 	ManuscriptDocument,
+	NovelProject,
 	TrimSize,
 	TypographyPreset
 } from '$lib/domain/types';
@@ -29,7 +31,7 @@ export type BookTypographyStyle = {
 export type TypesetDocumentHeading = {
 	kind: DocumentKind;
 	label?: string;
-	title: string;
+	title?: string;
 };
 
 export const BOOK_PAGE_METRICS: Record<TrimSize, BookPageMetrics> = {
@@ -99,6 +101,7 @@ export function bookTypographyStyle(preset: TypographyPreset): BookTypographySty
 }
 
 export function typesetDocumentHeading(
+	project: NovelProject,
 	documents: ManuscriptDocument[],
 	document: ManuscriptDocument
 ): TypesetDocumentHeading {
@@ -111,15 +114,18 @@ export function typesetDocumentHeading(
 	}
 
 	const number = chapterNumber(documents, document.id);
+	const settings = documentChapterHeading(project, document);
+	const label = settings.showLabel ? chapterLabel(settings.labelTemplate, number) : '';
 	const automaticTitle = number ? `Chapter ${number}` : 'Chapter';
-	if (!cleanTitle || /^chapter\s+\d+$/i.test(cleanTitle)) {
-		return { kind: document.kind, title: automaticTitle };
-	}
+	const title = /^chapter\s+\d+$/i.test(cleanTitle) ? automaticTitle : cleanTitle;
+	const visibleTitle = settings.showTitle ? title || 'Untitled chapter' : '';
+	const visibleLabel =
+		label && label.toLocaleLowerCase() !== visibleTitle.toLocaleLowerCase() ? label : '';
 
 	return {
 		kind: document.kind,
-		label: automaticTitle,
-		title: cleanTitle
+		...(visibleLabel ? { label: visibleLabel } : {}),
+		...(visibleTitle ? { title: visibleTitle } : {})
 	};
 }
 

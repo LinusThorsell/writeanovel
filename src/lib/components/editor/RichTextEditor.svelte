@@ -76,7 +76,7 @@
 		typographyStyle.editorBodyFontSizeRem * 16 * BOOK_LAYOUT.documentHeadingGapEm
 	);
 	const documentHeadingSpace = $derived(
-		typesetHeading
+		typesetHeading?.label || typesetHeading?.title
 			? Math.max(
 					0,
 					documentHeadingTop + documentHeadingHeight + documentHeadingGap - pageMarginBlock
@@ -379,7 +379,7 @@
 				<div class="page-sheet"><span>Page {pageNumber}</span></div>
 			{/each}
 		</div>
-		{#if typesetHeading}
+		{#if typesetHeading?.label || typesetHeading?.title}
 			<div
 				class="typeset-document-heading"
 				class:chapter-heading={typesetHeading.kind === 'chapter'}
@@ -389,7 +389,7 @@
 				{#if typesetHeading.label}
 					<p>{typesetHeading.label}</p>
 				{/if}
-				<h1>{typesetHeading.title}</h1>
+				{#if typesetHeading.title}<h1>{typesetHeading.title}</h1>{/if}
 			</div>
 		{/if}
 		<div class="editor-mount" {@attach mountEditor}></div>

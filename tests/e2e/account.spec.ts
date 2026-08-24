@@ -14,6 +14,15 @@ test('migrates a local novel and restores it after premium login on a fresh devi
 	await page.getByRole('button', { name: 'Create novel', exact: true }).click();
 	await page.locator('.writing-surface').fill('This manuscript began as a free local novel.');
 	await page.waitForTimeout(700);
+	await page.getByRole('button', { name: 'Book settings' }).click();
+	await page.getByLabel('Chapter label text').fill('Part {number}');
+	await page.getByRole('checkbox', { name: /Chapter title/ }).uncheck();
+	await page.getByRole('button', { name: 'Save book settings' }).click();
+	await page.getByRole('button', { name: 'Chapter heading' }).click();
+	await page.getByRole('checkbox', { name: /Use book-wide heading style/ }).uncheck();
+	await page.getByLabel('Chapter label text').fill('Act {number}');
+	await page.getByRole('button', { name: 'Save chapter heading' }).click();
+	await expect(page.getByLabel('Typeset page heading')).toContainText('Act 1');
 
 	await page.getByRole('button', { name: 'Account and cloud storage' }).click();
 	await page.getByRole('tab', { name: 'Create account' }).click();
@@ -44,6 +53,13 @@ test('migrates a local novel and restores it after premium login on a fresh devi
 		await expect(cloudPage.locator('.writing-surface')).toContainText(
 			'This manuscript began as a free local novel.'
 		);
+		await expect(cloudPage.getByLabel('Typeset page heading')).toContainText('Act 1');
+		await cloudPage.getByRole('button', { name: 'Chapter heading' }).click();
+		await expect(
+			cloudPage.getByRole('checkbox', { name: /Use book-wide heading style/ })
+		).not.toBeChecked();
+		await cloudPage.getByRole('checkbox', { name: /Use book-wide heading style/ }).check();
+		await expect(cloudPage.getByLabel('Chapter heading preview')).toContainText('Part 1');
 	} finally {
 		await cloudContext.close();
 	}

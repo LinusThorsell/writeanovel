@@ -7,6 +7,7 @@ import type {
 	StoryNote
 } from './types';
 import { EMPTY_DOCUMENT } from './types';
+import { DEFAULT_CHAPTER_HEADING } from './chapter-headings';
 
 const now = () => new Date().toISOString();
 
@@ -20,6 +21,7 @@ export function createNovelProject(input: Pick<NovelProject, 'title' | 'author'>
 		synopsis: '',
 		trimSize: 'trade-6x9',
 		typography: 'literary',
+		chapterHeading: { ...DEFAULT_CHAPTER_HEADING },
 		createdAt: timestamp,
 		updatedAt: timestamp
 	};

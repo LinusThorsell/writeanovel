@@ -9,6 +9,7 @@ import {
 import { chapterNumber, documentsOfKind, moveDocument, nextPosition } from '$lib/domain/ordering';
 import type {
 	AuthenticatedUser,
+	ChapterHeadingSettings,
 	DocumentKind,
 	ManuscriptDocument,
 	MatterType,
@@ -245,6 +246,31 @@ export class WriteANovelState {
 		await this.library.saveDocument(updated);
 	}
 
+	async updateChapterHeadingOverride(
+		documentId: string,
+		chapterHeadingOverride: ChapterHeadingSettings | undefined
+	): Promise<void> {
+		if (!this.workspace) return;
+		const existing = this.workspace.documents.find((document) => document.id === documentId);
+		if (!existing || existing.kind !== 'chapter') return;
+		const updated: ManuscriptDocument = {
+			...existing,
+			...(chapterHeadingOverride ? { chapterHeadingOverride } : {}),
+			updatedAt: new Date().toISOString()
+		};
+		if (!chapterHeadingOverride) delete updated.chapterHeadingOverride;
+		await this.library.saveDocument(updated);
+		this.workspace = {
+			...this.workspace,
+			documents: this.workspace.documents.map((document) =>
+				document.id === documentId ? updated : document
+			)
+		};
+		this.showNotice(
+			chapterHeadingOverride ? 'Chapter heading override saved.' : 'Using the book heading style.'
+		);
+	}
+
 	async updateNoteBody(noteId: string, body: RichTextNode): Promise<void> {
 		if (!this.workspace) return;
 		const existing = this.workspace.notes.find((note) => note.id === noteId);
@@ -329,6 +355,7 @@ export class WriteANovelState {
 		synopsis: string;
 		trimSize: TrimSize;
 		typography: TypographyPreset;
+		chapterHeading: ChapterHeadingSettings;
 	}): Promise<void> {
 		if (!this.workspace) return;
 		const project = {
