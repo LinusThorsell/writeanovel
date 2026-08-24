@@ -39,7 +39,7 @@ export class WriteANovelState {
 	syncStatus = $state<SyncStatus>('local');
 	loading = $state(true);
 	working = $state(false);
-	exporting = $state<'pdf' | 'epub'>();
+	exporting = $state<'epub'>();
 	accountOpen = $state(false);
 	settingsOpen = $state(false);
 	notice = $state<string>();
@@ -233,6 +233,12 @@ export class WriteANovelState {
 	}
 
 	async updateDocumentBody(documentId: string, body: RichTextNode): Promise<void> {
+		this.updateDocumentBodyDraft(documentId, body);
+		const updated = this.workspace?.documents.find((document) => document.id === documentId);
+		if (updated) await this.library.saveDocument(updated);
+	}
+
+	updateDocumentBodyDraft(documentId: string, body: RichTextNode): void {
 		if (!this.workspace) return;
 		const existing = this.workspace.documents.find((document) => document.id === documentId);
 		if (!existing) return;
@@ -243,7 +249,6 @@ export class WriteANovelState {
 				document.id === documentId ? updated : document
 			)
 		};
-		await this.library.saveDocument(updated);
 	}
 
 	async updateChapterHeadingOverride(
@@ -272,6 +277,12 @@ export class WriteANovelState {
 	}
 
 	async updateNoteBody(noteId: string, body: RichTextNode): Promise<void> {
+		this.updateNoteBodyDraft(noteId, body);
+		const updated = this.workspace?.notes.find((note) => note.id === noteId);
+		if (updated) await this.library.saveNote(updated);
+	}
+
+	updateNoteBodyDraft(noteId: string, body: RichTextNode): void {
 		if (!this.workspace) return;
 		const existing = this.workspace.notes.find((note) => note.id === noteId);
 		if (!existing) return;
@@ -280,7 +291,6 @@ export class WriteANovelState {
 			...this.workspace,
 			notes: this.workspace.notes.map((note) => (note.id === noteId ? updated : note))
 		};
-		await this.library.saveNote(updated);
 	}
 
 	async updateNoteSummary(noteId: string, summary: string): Promise<void> {
@@ -435,18 +445,13 @@ export class WriteANovelState {
 		await this.reloadAfterCloudChange();
 	}
 
-	async export(format: 'pdf' | 'epub'): Promise<void> {
+	async exportEpub(): Promise<void> {
 		if (!this.workspace) return;
-		this.exporting = format;
+		this.exporting = 'epub';
 		try {
-			if (format === 'pdf') {
-				const { exportPdf } = await import('$lib/export/pdf-exporter');
-				await exportPdf(this.workspace);
-			} else {
-				const { exportEpub } = await import('$lib/export/epub-exporter');
-				await exportEpub(this.workspace);
-			}
-			this.showNotice(`${format.toUpperCase()} export is ready.`);
+			const { exportEpub } = await import('$lib/export/epub-exporter');
+			await exportEpub(this.workspace);
+			this.showNotice('EPUB export is ready.');
 		} finally {
 			this.exporting = undefined;
 		}

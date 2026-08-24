@@ -139,6 +139,7 @@
 		>
 			{#if model.activeDocument}
 				{#key model.activeDocument.id}
+					{@const documentId = model.activeDocument.id}
 					<RichTextEditor
 						body={model.activeDocument.body}
 						assetUrls={model.assetUrls}
@@ -148,20 +149,27 @@
 						placeholder={model.activeDocument.kind === 'chapter'
 							? 'Begin this chapter…'
 							: 'Write this page…'}
-						onChange={(body) => model.updateDocumentBody(model.activeDocument!.id, body)}
+						onChange={(body) => model.updateDocumentBodyDraft(documentId, body)}
+						onSave={(body) => {
+							void model.updateDocumentBody(documentId, body);
+						}}
 						onAddMedia={(file) => model.addMedia(file)}
 						onError={(message) => model.showError(message)}
 					/>
 				{/key}
 			{:else if model.activeNote}
 				{#key model.activeNote.id}
+					{@const noteId = model.activeNote.id}
 					<RichTextEditor
 						body={model.activeNote.body}
 						assetUrls={model.assetUrls}
 						typography="modern"
 						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
 						placeholder="Add details, ideas, relationships, and reminders…"
-						onChange={(body) => model.updateNoteBody(model.activeNote!.id, body)}
+						onChange={(body) => model.updateNoteBodyDraft(noteId, body)}
+						onSave={(body) => {
+							void model.updateNoteBody(noteId, body);
+						}}
 						onAddMedia={(file) => model.addMedia(file)}
 						onError={(message) => model.showError(message)}
 					/>

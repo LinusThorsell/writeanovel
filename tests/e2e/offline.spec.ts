@@ -35,5 +35,17 @@ test('installed app reloads and keeps writing with the network disabled', async 
 	await expect(page.locator('.writing-surface')).toContainText('connection disappeared');
 	await page.locator('.writing-surface').fill('Written completely offline.');
 	await page.waitForTimeout(700);
+	await page.evaluate(() => {
+		window.print = () => {
+			const printable = document.querySelector<HTMLElement>('.print-book');
+			document.body.dataset.offlinePrintText = printable?.textContent ?? '';
+		};
+	});
+	await page.getByText('Export', { exact: true }).click();
+	await page.getByRole('button', { name: /Print \/ PDF/ }).click();
+	await expect(page.locator('body')).toHaveAttribute(
+		'data-offline-print-text',
+		/Written completely offline/
+	);
 	await context.setOffline(false);
 });

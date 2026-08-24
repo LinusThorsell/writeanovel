@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { flushSync, tick } from 'svelte';
 	import {
 		ArrowLeft,
 		ChevronDown,
@@ -12,18 +13,54 @@
 	} from '@lucide/svelte';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import BookSettingsModal from '$lib/components/settings/BookSettingsModal.svelte';
+	import PrintableBook from '$lib/components/export/PrintableBook.svelte';
+	import { printBrowserBook } from '$lib/export/browser-print';
 	import EditorPane from './EditorPane.svelte';
 	import WorkspaceSidebar from './WorkspaceSidebar.svelte';
 
 	let { model }: { model: WriteANovelState } = $props();
 	let sidebarOpen = $state(false);
 	let exportOpen = $state(false);
+	let printBookVisible = $state(false);
+	let printing = $state(false);
+	let printableElement = $state.raw<HTMLElement>();
 
-	async function exportBook(format: 'pdf' | 'epub'): Promise<void> {
+	async function exportEpub(): Promise<void> {
 		exportOpen = false;
-		await model.export(format);
+		await model.exportEpub();
+	}
+
+	function handleBeforePrint(): void {
+		if (!model.workspace) return;
+		flushSync(() => {
+			printBookVisible = true;
+		});
+	}
+
+	function handleAfterPrint(): void {
+		printBookVisible = false;
+		printing = false;
+	}
+
+	async function printPdf(): Promise<void> {
+		if (!model.workspace) return;
+		exportOpen = false;
+		printing = true;
+		printBookVisible = true;
+		try {
+			await tick();
+			if (!printableElement) throw new Error('The print layout could not be prepared.');
+			await printBrowserBook(printableElement, model.workspace.project.title);
+		} catch (error) {
+			model.showError(error instanceof Error ? error.message : 'The print dialog could not open.');
+		} finally {
+			printBookVisible = false;
+			printing = false;
+		}
 	}
 </script>
+
+<svelte:window onbeforeprint={handleBeforePrint} onafterprint={handleAfterPrint} />
 
 <div class="workspace-page">
 	<header class="topbar">
@@ -65,16 +102,16 @@
 				<div>
 					<button
 						type="button"
-						disabled={model.exporting !== undefined}
-						onclick={() => exportBook('pdf')}
+						disabled={model.exporting !== undefined || printing}
+						onclick={printPdf}
 						><FileText size={17} /><span
-							><strong>PDF</strong><small>Typeset, ready to print</small></span
+							><strong>Print / PDF</strong><small>Print or choose Save as PDF</small></span
 						></button
 					>
 					<button
 						type="button"
-						disabled={model.exporting !== undefined}
-						onclick={() => exportBook('epub')}
+						disabled={model.exporting !== undefined || printing}
+						onclick={exportEpub}
 						><Download size={17} /><span
 							><strong>EPUB</strong><small>For e-readers and stores</small></span
 						></button
@@ -109,6 +146,14 @@
 
 {#if model.settingsOpen}
 	<BookSettingsModal {model} />
+{/if}
+
+{#if printBookVisible && model.workspace}
+	<PrintableBook
+		workspace={model.workspace}
+		assetUrls={model.assetUrls}
+		onElement={(element) => (printableElement = element)}
+	/>
 {/if}
 
 <style>

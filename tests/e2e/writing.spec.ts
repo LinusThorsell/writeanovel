@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { extractTextItems } from 'unpdf';
 
@@ -25,6 +24,12 @@ async function createNovel(
 	await page.getByLabel('Author name').fill('Lin Writer');
 	await page.getByRole('button', { name: 'Create novel', exact: true }).click();
 	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 1');
+}
+
+async function renderBrowserPdf(page: import('@playwright/test').Page): Promise<Uint8Array> {
+	await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+	await expect(page.getByLabel('Printable book')).toBeAttached();
+	return new Uint8Array(await page.pdf({ preferCSSPageSize: true, printBackground: true }));
 }
 
 test.beforeEach(async ({ page }) => {
@@ -80,6 +85,8 @@ test('flows a long chapter across pages and restores the writing position after 
 	const displayedPageCount = Number.parseInt((await pagination.textContent()) ?? '', 10);
 	await expect(page.locator('.page-sheet')).toHaveCount(displayedPageCount);
 	await expect(page.locator('.page-break-decoration')).toHaveCount(displayedPageCount - 1);
+	const printedLongChapter = await extractTextItems(await renderBrowserPdf(page));
+	expect(printedLongChapter.totalPages).toBe(displayedPageCount);
 
 	const textClearsPageGaps = await editor.evaluate((element) => {
 		const gaps = Array.from(element.querySelectorAll<HTMLElement>('.page-break-decoration')).map(
@@ -217,7 +224,7 @@ test('anonymous free writing makes no PocketBase requests', async ({ page }) => 
 	await expect.poll(() => backendRequests).toEqual([]);
 });
 
-test('exports direct PDF and EPUB downloads', async ({ page }) => {
+test('prints the same typeset book through the browser and downloads EPUB', async ({ page }) => {
 	await createNovel(page, 'Exportable Story');
 	await page.getByLabel('Page title').fill('The Lantern Room');
 	await page.getByLabel('Page title').press('Enter');
@@ -253,16 +260,21 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	});
 	expect(editorTypesettingMatches).toBe(true);
 
+	await page.evaluate(() => {
+		window.print = () => {
+			const printable = document.querySelector<HTMLElement>('.print-book');
+			document.body.dataset.printInvoked = 'true';
+			document.body.dataset.printText = printable?.textContent ?? '';
+		};
+	});
 	await page.getByText('Export', { exact: true }).click();
-	const pdfDownload = page.waitForEvent('download');
-	await page.getByRole('button', { name: /PDF/ }).click();
-	const downloadedPdf = await pdfDownload;
-	expect(downloadedPdf.suggestedFilename()).toBe('exportable-story.pdf');
-	const pdfPath = await downloadedPdf.path();
-	if (!pdfPath) throw new Error('The exported PDF was not available for verification.');
-	const pdfBytes = new Uint8Array(await readFile(pdfPath));
+	await page.getByRole('button', { name: /Print \/ PDF/ }).click();
+	await expect(page.locator('body')).toHaveAttribute('data-print-invoked', 'true');
+	await expect(page.locator('body')).toHaveAttribute('data-print-text', /The Lantern Room/);
+
+	const pdfBytes = await renderBrowserPdf(page);
 	expect(new TextDecoder().decode(pdfBytes.slice(0, 5))).toBe('%PDF-');
-	const extracted = await extractTextItems(pdfBytes);
+	const extracted = await extractTextItems(new Uint8Array(pdfBytes));
 	expect(extracted.totalPages).toBeGreaterThanOrEqual(1);
 	const firstPageItems = extracted.items[0];
 	const firstPageText = firstPageItems.map((item) => item.str).join(' ');
@@ -312,12 +324,7 @@ test('uses book-wide chapter headings with persistent per-chapter overrides in t
 	await page.getByRole('button', { name: /1 The Threshold/ }).click();
 	await expect(page.getByLabel('Typeset page heading')).toContainText('Scene 1');
 
-	await page.getByText('Export', { exact: true }).click();
-	const pdfDownload = page.waitForEvent('download');
-	await page.getByRole('button', { name: /PDF/ }).click();
-	const pdfPath = await (await pdfDownload).path();
-	if (!pdfPath) throw new Error('The heading PDF was not available for verification.');
-	const extracted = await extractTextItems(new Uint8Array(await readFile(pdfPath)));
+	const extracted = await extractTextItems(await renderBrowserPdf(page));
 	const pdfText = extracted.items
 		.flat()
 		.map((item) => item.str)
@@ -386,6 +393,7 @@ test('configures book pages, raster and SVG covers, and positioned resizable art
 
 	const originalSize = await artwork.boundingBox();
 	const resizeHandle = page.locator('[data-resize-handle="bottom-right"]');
+	await resizeHandle.scrollIntoViewIfNeeded();
 	const handleBox = await resizeHandle.boundingBox();
 	if (!originalSize || !handleBox) throw new Error('The image resize controls are not visible.');
 	const handleCenter = {
@@ -395,13 +403,20 @@ test('configures book pages, raster and SVG covers, and positioned resizable art
 	const hitResizeHandle = await page.evaluate(({ x, y }) => {
 		const hit = document.elementFromPoint(x, y);
 		return hit instanceof HTMLElement
-			? hit.closest<HTMLElement>('[data-resize-handle]')?.dataset.resizeHandle
-			: undefined;
+			? {
+					handle: hit.closest<HTMLElement>('[data-resize-handle]')?.dataset.resizeHandle,
+					tag: hit.tagName,
+					className: hit.className
+				}
+			: { tag: 'none', className: '' };
 	}, handleCenter);
-	expect(hitResizeHandle).toBe('bottom-right');
-	await page.mouse.move(handleCenter.x, handleCenter.y);
-	await page.mouse.down();
-	await expect(imageContainer).toHaveAttribute('data-resize-state', 'true');
+	expect(hitResizeHandle.handle, JSON.stringify(hitResizeHandle)).toBe('bottom-right');
+	await resizeHandle.dispatchEvent('mousedown', {
+		clientX: handleCenter.x,
+		clientY: handleCenter.y,
+		button: 0,
+		buttons: 1
+	});
 	await page.mouse.move(handleBox.x + 80, handleBox.y + 45, { steps: 5 });
 	await page.mouse.up();
 	await expect
@@ -417,4 +432,6 @@ test('configures book pages, raster and SVG covers, and positioned resizable art
 	await expect
 		.poll(async () => (await restoredArtwork.boundingBox())?.width ?? 0)
 		.toBeGreaterThan(resizedWidth - 2);
+	const illustratedPdf = await extractTextItems(await renderBrowserPdf(page));
+	expect(illustratedPdf.totalPages).toBeGreaterThanOrEqual(5);
 });

@@ -42,7 +42,7 @@
 		{
 			step: '04',
 			title: 'Export and share',
-			text: 'Download a typeset PDF and a reflowable EPUB 3 file directly.',
+			text: 'Print the matching book layout or choose Save as PDF, and download a reflowable EPUB 3 file.',
 			icon: Download
 		}
 	] as const;
@@ -236,7 +236,7 @@
 		<ul>
 			<li><Check size={17} />Front matter, back matter, and covers</li>
 			<li><Check size={17} />Positioned and resizable raster or SVG artwork</li>
-			<li><Check size={17} />Direct typeset PDF download</li>
+			<li><Check size={17} />Matching print and Save as PDF layout</li>
 			<li><Check size={17} />Reflowable EPUB 3 download</li>
 		</ul>
 		<a class="button button-secondary" href={resolve('/book-typesetting')}
