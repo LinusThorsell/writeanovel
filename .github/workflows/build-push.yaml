@@ -1,0 +1,86 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push application
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            PUBLIC_POCKETBASE_URL=https://writeanovel-pb.linus.solutions
+
+      - name: Build and push PocketBase with migrations
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          docker build \
+            --file - \
+            --platform linux/amd64 \
+            --tag ghcr.io/linusthorsell/writeanovel-pocketbase:sha-${SHORT_SHA} \
+            --tag ghcr.io/linusthorsell/writeanovel-pocketbase:latest \
+            . <<'EOF'
+          FROM ghcr.io/muchobien/pocketbase:0.39.5
+          COPY pocketbase/pb_migrations /pb_migrations
+          EOF
+          docker push ghcr.io/linusthorsell/writeanovel-pocketbase:sha-${SHORT_SHA}
+          docker push ghcr.io/linusthorsell/writeanovel-pocketbase:latest
+
+  update-manifests:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout kubes repo
+        uses: actions/checkout@v4
+        with:
+          repository: LinusThorsell/kubes
+          token: ${{ secrets.KUBES_DEPLOY_TOKEN }}
+
+      - name: Update image tags
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          sed -i "s|image: ghcr.io/linusthorsell/writeanovel:.*|image: ghcr.io/linusthorsell/writeanovel:sha-${SHORT_SHA}|" manifests/writeanovel/writeanovel-app.yaml
+          sed -i "s|image: ghcr.io/linusthorsell/writeanovel-pocketbase:.*|image: ghcr.io/linusthorsell/writeanovel-pocketbase:sha-${SHORT_SHA}|" manifests/writeanovel/pocketbase.yaml
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifests/writeanovel/writeanovel-app.yaml manifests/writeanovel/pocketbase.yaml
+          git commit -m "deploy: writeanovel sha-$(echo '${{ github.sha }}' | cut -c1-7)"
+          git push
