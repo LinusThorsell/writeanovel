@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { extractTextItems } from 'unpdf';
 
@@ -25,6 +26,23 @@ async function createNovel(
 	await page.getByLabel('Author name').fill('Lin Writer');
 	await page.getByRole('button', { name: 'Create novel', exact: true }).click();
 	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 1');
+}
+
+async function captureRenderedPdfFooter(
+	page: import('@playwright/test').Page,
+	pdfPath: string
+): Promise<Buffer> {
+	const pdfViewer = await page.context().newPage();
+	try {
+		await pdfViewer.setViewportSize({ width: 900, height: 1_100 });
+		await pdfViewer.goto(pathToFileURL(pdfPath).href);
+		await pdfViewer.waitForTimeout(1_500);
+		return await pdfViewer.screenshot({
+			clip: { x: 300, y: 760, width: 600, height: 190 }
+		});
+	} finally {
+		await pdfViewer.close();
+	}
 }
 
 test.beforeEach(async ({ page }) => {
@@ -55,7 +73,7 @@ test('creates, orders, writes, and persists a multi-file novel locally', async (
 	await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 });
 
-test('flows a long chapter across pages and restores the writing position after reload', async ({
+test('keeps a long chapter on one continuous scrollable page and restores the writing position after reload', async ({
 	page
 }) => {
 	await createNovel(page, 'The Long Road');
@@ -68,47 +86,19 @@ test('flows a long chapter across pages and restores the writing position after 
 
 	const editor = page.locator('.writing-surface');
 	await editor.fill(paragraphs.join('\n\n'));
-
-	const pagination = page.getByLabel('Manuscript pagination');
-	await expect(pagination).toContainText(/\d+\s+pages/);
+	await expect(page.locator('.page-sheet')).toHaveCount(0);
+	await expect(page.locator('.page-break-decoration')).toHaveCount(0);
+	await expect(page.getByLabel('Manuscript pagination')).toHaveCount(0);
 	await expect
-		.poll(async () => {
-			const label = (await pagination.textContent()) ?? '';
-			return Number.parseInt(label, 10);
-		})
-		.toBeGreaterThan(2);
-	const displayedPageCount = Number.parseInt((await pagination.textContent()) ?? '', 10);
-	await expect(page.locator('.page-sheet')).toHaveCount(displayedPageCount);
-	await expect(page.locator('.page-break-decoration')).toHaveCount(displayedPageCount - 1);
-
-	const textClearsPageGaps = await editor.evaluate((element) => {
-		const gaps = Array.from(element.querySelectorAll<HTMLElement>('.page-break-decoration')).map(
-			(gap) => gap.getBoundingClientRect()
-		);
-		const textRectangles: DOMRect[] = [];
-		const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-		let textNode = walker.nextNode();
-		while (textNode) {
-			if (textNode.parentElement?.closest('.page-break-decoration')) {
-				textNode = walker.nextNode();
-				continue;
-			}
-			const range = document.createRange();
-			range.selectNodeContents(textNode);
-			textRectangles.push(...Array.from(range.getClientRects()));
-			textNode = walker.nextNode();
-		}
-
-		return gaps.every((gap) =>
-			textRectangles.every((text) => text.bottom <= gap.top + 1 || text.top >= gap.bottom - 1)
-		);
-	});
-	expect(textClearsPageGaps).toBe(true);
+		.poll(async () =>
+			page.locator('.paper').evaluate((element) => element.getBoundingClientRect().height)
+		)
+		.toBeGreaterThan(4_000);
 
 	await editor.focus();
 	await page.keyboard.press('Control+End');
-	await page.keyboard.type('\n\nThis sentence was added after automatic pagination.');
-	await expect(editor).toContainText('added after automatic pagination');
+	await page.keyboard.type('\n\nThis sentence was added to the continuous writing surface.');
+	await expect(editor).toContainText('added to the continuous writing surface');
 
 	const layoutFits = await page.evaluate(() => {
 		const workspace = document.querySelector<HTMLElement>('.workspace-page');
@@ -139,7 +129,8 @@ test('flows a long chapter across pages and restores the writing position after 
 	expect(layoutFits).toBe(true);
 
 	await page.setViewportSize({ width: 390, height: 844 });
-	await expect.poll(async () => page.locator('.page-break-decoration').count()).toBeGreaterThan(2);
+	await expect(page.locator('.page-sheet')).toHaveCount(0);
+	await expect(page.locator('.page-break-decoration')).toHaveCount(0);
 	const mobileLayoutFits = await page.evaluate(() => {
 		const workspace = document.querySelector<HTMLElement>('.workspace-page');
 		const editorArea = document.querySelector<HTMLElement>('.editor-area');
@@ -188,8 +179,8 @@ test('flows a long chapter across pages and restores the writing position after 
 	await page.reload();
 	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 1');
 	await expect(editor).toContainText('Passage 150');
-	await expect(editor).toContainText('added after automatic pagination');
-	await expect.poll(async () => page.locator('.page-break-decoration').count()).toBeGreaterThan(1);
+	await expect(editor).toContainText('added to the continuous writing surface');
+	await expect(page.locator('.page-break-decoration')).toHaveCount(0);
 	await expect
 		.poll(async () =>
 			editorArea.evaluate(
@@ -231,14 +222,14 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 		const heading = document.querySelector<HTMLElement>('.typeset-document-heading');
 		const title = heading?.querySelector<HTMLElement>('h1');
 		const body = document.querySelector<HTMLElement>('.writing-surface p');
-		const pageSheet = document.querySelector<HTMLElement>('.page-sheet');
+		const paper = document.querySelector<HTMLElement>('.paper');
 		const writingSurface = document.querySelector<HTMLElement>('.writing-surface');
-		if (!heading || !title || !body || !pageSheet || !writingSurface) return false;
+		if (!heading || !title || !body || !paper || !writingSurface) return false;
 
 		const headingBounds = heading.getBoundingClientRect();
 		const titleBounds = title.getBoundingClientRect();
 		const bodyBounds = body.getBoundingClientRect();
-		const pageBounds = pageSheet.getBoundingClientRect();
+		const pageBounds = paper.getBoundingClientRect();
 		const headingStyle = getComputedStyle(heading);
 		const bodyStyle = getComputedStyle(writingSurface);
 		return (
@@ -277,11 +268,29 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	expect(titleItem.fontSize).toBeGreaterThan(bodyItem.fontSize);
 	expect(titleItem.y).toBeGreaterThan(bodyItem.y);
 	expect(Math.abs(titleItem.x + titleItem.width / 2 - 216)).toBeLessThan(6);
+	expect(await captureRenderedPdfFooter(page, pdfPath)).toMatchSnapshot(
+		'visible-default-page-number-footer.png',
+		{ maxDiffPixelRatio: 0.02 }
+	);
 
 	await page.getByText('Export', { exact: true }).click();
 	const epubDownload = page.waitForEvent('download');
 	await page.getByRole('button', { name: /EPUB/ }).click();
 	expect((await epubDownload).suggestedFilename()).toBe('exportable-story.epub');
+
+	await page.getByRole('button', { name: 'Book settings' }).click();
+	await page.getByLabel('Typography').selectOption('modern');
+	await page.getByRole('button', { name: 'Save book settings' }).click();
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	await page.getByText('Export', { exact: true }).click();
+	const modernPdfDownload = page.waitForEvent('download');
+	await page.getByRole('button', { name: /PDF/ }).click();
+	const modernPdfPath = await (await modernPdfDownload).path();
+	if (!modernPdfPath) throw new Error('The Modern preset PDF was not available for verification.');
+	expect(await captureRenderedPdfFooter(page, modernPdfPath)).toMatchSnapshot(
+		'visible-modern-page-number-footer.png',
+		{ maxDiffPixelRatio: 0.02 }
+	);
 });
 
 test('configures a visible document range, sequence, numeral style, template, and position for PDF page numbers', async ({
@@ -323,6 +332,7 @@ test('configures a visible document range, sequence, numeral style, template, an
 	await page.getByLabel('Page number text').fill('Folio {number}');
 	await expect(page.getByLabel('Page number preview')).toContainText('Folio vii');
 	await page.getByRole('button', { name: 'Save book settings' }).click();
+	await expect(page.getByRole('dialog')).toHaveCount(0);
 
 	await page.reload();
 	await page.getByRole('button', { name: 'Book settings' }).click();
@@ -337,6 +347,7 @@ test('configures a visible document range, sequence, numeral style, template, an
 	await expect(page.getByLabel('Page number position')).toHaveValue('bottom-center');
 	await expect(page.getByLabel('Page number text')).toHaveValue('Folio {number}');
 	await page.getByRole('button', { name: 'Save book settings' }).click();
+	await expect(page.getByRole('dialog')).toHaveCount(0);
 
 	await page.getByText('Export', { exact: true }).click();
 	const pdfDownload = page.waitForEvent('download');

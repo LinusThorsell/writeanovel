@@ -4,7 +4,6 @@
 		AlignLeft,
 		AlignRight,
 		Bold,
-		Files,
 		ImagePlus,
 		Italic,
 		Link,
@@ -60,16 +59,12 @@
 
 	let editor = $state.raw<Editor>();
 	let revision = $state(0);
-	let pageCount = $state(1);
 	let pageHeight = $state(1_104);
-	let pageGap = $state(32);
 	let pageMarginInline = $state(88);
 	let pageMarginBlock = $state(88);
 	let documentHeadingHeight = $state(0);
 	let mediaInput = $state<HTMLInputElement>();
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
-	const pageNumbers = $derived(Array.from({ length: pageCount }, (_, index) => index + 1));
-	const canvasHeight = $derived(pageCount * pageHeight + (pageCount - 1) * pageGap);
 	const typographyStyle = $derived(bookTypographyStyle(typography));
 	const documentHeadingTop = $derived(pageHeight * BOOK_LAYOUT.documentHeadingTopRatio);
 	const documentHeadingGap = $derived(
@@ -88,7 +83,6 @@
 		if (element.clientWidth <= 0) return;
 		const layout = calculateEditorPageLayout(trimSize, element.clientWidth);
 		pageHeight = layout.pageHeight;
-		pageGap = layout.pageGap;
 		pageMarginInline = layout.pageMarginInline;
 		pageMarginBlock = layout.pageMarginBlock;
 	}
@@ -127,11 +121,7 @@
 		const initialBody = untrack(() => hydrateAssetSources(body, assetUrls));
 		const instance = new Editor({
 			element,
-			extensions: editorExtensions(placeholder, {
-				onPageCount: (nextPageCount) => {
-					pageCount = nextPageCount;
-				}
-			}),
+			extensions: editorExtensions(placeholder),
 			content: initialBody,
 			editorProps: {
 				attributes: {
@@ -315,11 +305,6 @@
 			onchange={insertMedia}
 		/>
 		<span class="toolbar-spacer"></span>
-		<span class="pagination-status" aria-label="Manuscript pagination">
-			<Files size={16} />
-			{pageCount}
-			{pageCount === 1 ? 'page' : 'pages'}
-		</span>
 		<button type="button" aria-label="Undo" onclick={() => editor?.chain().focus().undo().run()}
 			><Undo2 size={18} /></button
 		>
@@ -348,10 +333,8 @@
 		class="paper"
 		{@attach observePaper}
 		style:--page-height={`${pageHeight}px`}
-		style:--page-gap={`${pageGap}px`}
 		style:--page-margin-inline={`${pageMarginInline}px`}
 		style:--page-margin-block={`${pageMarginBlock}px`}
-		style:--canvas-height={`${canvasHeight}px`}
 		style:--body-font-family={typographyStyle.editorFontFamily}
 		style:--body-font-size={`${typographyStyle.editorBodyFontSizeRem}rem`}
 		style:--body-line-height={String(typographyStyle.lineHeight)}
@@ -374,11 +357,6 @@
 		style:--blockquote-margin-inline={`${BOOK_LAYOUT.blockquoteMarginInlineEm}em`}
 		style:--media-margin-block={`${BOOK_LAYOUT.mediaMarginBlockEm}em`}
 	>
-		<div class="page-stack" aria-hidden="true">
-			{#each pageNumbers as pageNumber (pageNumber)}
-				<div class="page-sheet"><span>Page {pageNumber}</span></div>
-			{/each}
-		</div>
 		{#if typesetHeading?.label || typesetHeading?.title}
 			<div
 				class="typeset-document-heading"
@@ -462,18 +440,6 @@
 		flex: 1 0 1rem;
 	}
 
-	.pagination-status {
-		display: inline-flex;
-		flex: 0 0 auto;
-		align-items: center;
-		gap: 0.35rem;
-		padding: 0 0.45rem;
-		color: var(--ink-soft);
-		font-size: 0.72rem;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
-
 	.image-toolbar {
 		display: flex;
 		align-items: center;
@@ -499,35 +465,11 @@
 		position: relative;
 		width: min(46rem, calc(100% - 2rem));
 		min-width: 0;
-		min-height: var(--canvas-height);
+		min-height: var(--page-height);
 		margin: 2rem auto 6rem;
-		isolation: isolate;
-	}
-
-	.page-stack {
-		position: absolute;
-		z-index: 0;
-		inset: 0 0 auto;
-		display: grid;
-		gap: var(--page-gap);
-		pointer-events: none;
-	}
-
-	.page-sheet {
-		position: relative;
-		height: var(--page-height);
 		background: #fffefb;
 		box-shadow: 0 8px 30px rgb(47 48 43 / 13%);
-	}
-
-	.page-sheet span {
-		position: absolute;
-		right: var(--page-margin-inline);
-		bottom: 1.35rem;
-		color: #96958f;
-		font-family: 'Manrope Variable', sans-serif;
-		font-size: 0.65rem;
-		font-variant-numeric: tabular-nums;
+		isolation: isolate;
 	}
 
 	.typeset-document-heading {
@@ -570,7 +512,7 @@
 		box-sizing: border-box;
 		width: 100%;
 		min-width: 0;
-		min-height: var(--canvas-height);
+		min-height: var(--page-height);
 		padding-block-start: calc(var(--page-margin-block) + var(--document-heading-space));
 		padding-block-end: var(--page-margin-block);
 		padding-inline: var(--page-margin-inline);
@@ -584,19 +526,6 @@
 		word-break: normal;
 		text-wrap: pretty;
 		outline: none;
-	}
-
-	.editor-mount :global(.page-break-decoration) {
-		display: block;
-		width: 100%;
-		height: calc(var(--page-margin-block) * 2 + var(--page-gap));
-		margin: 0;
-		pointer-events: none;
-		user-select: none;
-	}
-
-	.editor-mount :global(.pagination-measuring .page-break-decoration) {
-		display: none;
 	}
 
 	.editor-mount :global(.writing-surface p) {
@@ -711,7 +640,7 @@
 			margin: 0;
 		}
 
-		.page-sheet {
+		.paper {
 			box-shadow: none;
 		}
 	}

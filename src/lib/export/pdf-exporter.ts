@@ -15,7 +15,8 @@ import literaryRegularUrl from '@fontsource/libre-baskerville/files/libre-basker
 import literaryItalicUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-400-italic.woff?url';
 import literaryBoldUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-700-normal.woff?url';
 import literaryBoldItalicUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-700-italic.woff?url';
-import manropeUrl from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?url';
+import manropeRegularUrl from '@fontsource/manrope/files/manrope-latin-400-normal.woff?url';
+import manropeBoldUrl from '@fontsource/manrope/files/manrope-latin-700-normal.woff?url';
 import { manuscriptDocuments } from '$lib/domain/ordering';
 import {
 	bookPageNumbering,
@@ -272,19 +273,21 @@ async function prepareFonts(): Promise<void> {
 	if (fontsReady) return fontsReady;
 	fontsReady = (async () => {
 		pdfMake.addVirtualFileSystem(pdfFonts);
-		const [regular, italic, bold, boldItalic, manrope] = await Promise.all([
+		const [regular, italic, bold, boldItalic, manropeRegular, manropeBold] = await Promise.all([
 			fontBase64(literaryRegularUrl),
 			fontBase64(literaryItalicUrl),
 			fontBase64(literaryBoldUrl),
 			fontBase64(literaryBoldItalicUrl),
-			fontBase64(manropeUrl)
+			fontBase64(manropeRegularUrl),
+			fontBase64(manropeBoldUrl)
 		]);
 		pdfMake.addVirtualFileSystem({
 			'LibreBaskerville-Regular.woff': regular,
 			'LibreBaskerville-Italic.woff': italic,
 			'LibreBaskerville-Bold.woff': bold,
 			'LibreBaskerville-BoldItalic.woff': boldItalic,
-			'Manrope.woff2': manrope
+			'Manrope-Regular.woff': manropeRegular,
+			'Manrope-Bold.woff': manropeBold
 		});
 		pdfMake.addFonts({
 			Literary: {
@@ -294,10 +297,10 @@ async function prepareFonts(): Promise<void> {
 				bolditalics: 'LibreBaskerville-BoldItalic.woff'
 			},
 			Manrope: {
-				normal: 'Manrope.woff2',
-				bold: 'Manrope.woff2',
-				italics: 'Manrope.woff2',
-				bolditalics: 'Manrope.woff2'
+				normal: 'Manrope-Regular.woff',
+				bold: 'Manrope-Bold.woff',
+				italics: 'Manrope-Regular.woff',
+				bolditalics: 'Manrope-Bold.woff'
 			}
 		});
 	})();
@@ -359,6 +362,7 @@ function manuscriptHeadingContent(
 function configuredPageNumberFooter(
 	settings: PageNumberingSettings,
 	page: (typeof BOOK_PAGE_METRICS)[keyof typeof BOOK_PAGE_METRICS],
+	typography: BookTypographyStyle,
 	frontCoverPageCount: number
 ): DynamicContent {
 	let firstNumberedPhysicalPage: number | undefined;
@@ -374,7 +378,7 @@ function configuredPageNumberFooter(
 		return {
 			text: pageNumberText(settings, number),
 			alignment: pageNumberAlignment(settings.placement, manuscriptPage),
-			font: 'Manrope',
+			font: typography.pdfFont,
 			fontSize: 8.5,
 			color: '#3f4843',
 			margin: [page.marginInline, 8, page.marginInline, 0]
@@ -407,7 +411,7 @@ export async function buildPdfDefinition(
 		? numberedDocumentIds(pageNumbering, workspace.documents)
 		: new Set<string>();
 	const pageNumberFooter = pageNumbering
-		? configuredPageNumberFooter(pageNumbering, page, frontCover ? 1 : 0)
+		? configuredPageNumberFooter(pageNumbering, page, typography, frontCover ? 1 : 0)
 		: null;
 
 	for (const manuscriptDocument of documents) {

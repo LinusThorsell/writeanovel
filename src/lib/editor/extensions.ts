@@ -4,7 +4,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
 import Typography from '@tiptap/extension-typography';
 import StarterKit from '@tiptap/starter-kit';
-import { Pagination, type PaginationOptions } from './pagination';
 
 export const AssetImage = Image.extend({
 	addAttributes() {
@@ -27,7 +26,7 @@ export const AssetImage = Image.extend({
 	}
 });
 
-export function editorExtensions(placeholder: string, pagination: PaginationOptions): Extensions {
+export function editorExtensions(placeholder: string): Extensions {
 	return [
 		StarterKit.configure({
 			heading: { levels: [1, 2, 3] },
@@ -41,7 +40,6 @@ export function editorExtensions(placeholder: string, pagination: PaginationOpti
 		TextAlign.configure({ types: ['heading', 'paragraph'] }),
 		Typography,
 		Placeholder.configure({ placeholder }),
-		Pagination.configure(pagination),
 		AssetImage.configure({
 			allowBase64: false,
 			resize: {
