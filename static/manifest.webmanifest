@@ -1,6 +1,6 @@
 {
-	"name": "WriteABook",
-	"short_name": "WriteABook",
+	"name": "WriteANovel",
+	"short_name": "WriteANovel",
 	"description": "Write, plan, and typeset novels anywhere.",
 	"start_url": "/",
 	"display": "standalone",

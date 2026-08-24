@@ -30,7 +30,7 @@ export type MediaInsertion = {
 	name: string;
 };
 
-export class WriteABookState {
+export class WriteANovelState {
 	projects = $state.raw<NovelProject[]>([]);
 	workspace = $state.raw<WorkspaceSnapshot>();
 	activeItemId = $state<string>();

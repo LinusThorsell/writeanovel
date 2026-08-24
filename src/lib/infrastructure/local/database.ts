@@ -8,7 +8,7 @@ import type {
 	StoryNote
 } from '$lib/domain/types';
 
-export class WriteABookDatabase extends Dexie {
+export class WriteANovelDatabase extends Dexie {
 	projects!: Table<NovelProject, string>;
 	documents!: Table<ManuscriptDocument, string>;
 	notes!: Table<StoryNote, string>;
@@ -16,7 +16,7 @@ export class WriteABookDatabase extends Dexie {
 	preferences!: Table<AppPreferences, string>;
 	outbox!: Table<PendingChange, string>;
 
-	constructor(name = 'writeabook') {
+	constructor(name = 'writeanovel') {
 		super(name);
 		this.version(1).stores({
 			projects: 'id, updatedAt',
@@ -29,4 +29,4 @@ export class WriteABookDatabase extends Dexie {
 	}
 }
 
-export const localDatabase = new WriteABookDatabase();
+export const localDatabase = new WriteANovelDatabase();

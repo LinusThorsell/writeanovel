@@ -8,7 +8,7 @@ test('installed app reloads and keeps writing with the network disabled', async 
 	await page.evaluate(
 		() =>
 			new Promise<void>((resolve) => {
-				const request = indexedDB.deleteDatabase('writeabook');
+				const request = indexedDB.deleteDatabase('writeanovel');
 				request.onsuccess = () => resolve();
 				request.onerror = () => resolve();
 				request.onblocked = () => resolve();

@@ -11,11 +11,11 @@
 		Plus,
 		ScrollText
 	} from '@lucide/svelte';
-	import type { WriteABookState } from '$lib/application/writeabook-state.svelte';
+	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import { documentsOfKind } from '$lib/domain/ordering';
 	import type { DocumentKind, MatterType, NoteKind } from '$lib/domain/types';
 
-	let { model }: { model: WriteABookState } = $props();
+	let { model }: { model: WriteANovelState } = $props();
 	let frontMatterOpen = $state(false);
 	let backMatterOpen = $state(false);
 

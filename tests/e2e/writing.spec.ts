@@ -5,7 +5,7 @@ async function clearLocalLibrary(page: import('@playwright/test').Page): Promise
 	await page.evaluate(
 		() =>
 			new Promise<void>((resolve) => {
-				const request = indexedDB.deleteDatabase('writeabook');
+				const request = indexedDB.deleteDatabase('writeanovel');
 				request.onsuccess = () => resolve();
 				request.onerror = () => resolve();
 				request.onblocked = () => resolve();
@@ -27,6 +27,8 @@ async function createNovel(
 
 test.beforeEach(async ({ page }) => {
 	await clearLocalLibrary(page);
+	await expect(page).toHaveTitle('WriteANovel');
+	await expect(page.getByRole('link', { name: 'WriteANovel home' })).toContainText('WriteANovel');
 });
 
 test('creates, orders, writes, and persists a multi-file novel locally', async ({ page }) => {

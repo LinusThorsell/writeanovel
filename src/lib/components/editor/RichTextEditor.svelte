@@ -18,7 +18,7 @@
 	import { Editor } from '@tiptap/core';
 	import { untrack } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
-	import type { MediaInsertion } from '$lib/application/writeabook-state.svelte';
+	import type { MediaInsertion } from '$lib/application/writeanovel-state.svelte';
 	import {
 		MEDIA_ACCEPT_ATTRIBUTE,
 		hydrateAssetSources,

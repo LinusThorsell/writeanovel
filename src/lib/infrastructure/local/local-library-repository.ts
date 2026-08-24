@@ -10,12 +10,12 @@ import type {
 	StoryNote,
 	WorkspaceSnapshot
 } from '$lib/domain/types';
-import { WriteABookDatabase, localDatabase } from './database';
+import { WriteANovelDatabase, localDatabase } from './database';
 
 const CURRENT_PREFERENCES: AppPreferences = { id: 'current' };
 
 export class LocalLibraryRepository implements LocalLibraryPort {
-	constructor(private readonly database: WriteABookDatabase = localDatabase) {}
+	constructor(private readonly database: WriteANovelDatabase = localDatabase) {}
 
 	async listProjects(): Promise<NovelProject[]> {
 		return this.database.projects.orderBy('updatedAt').reverse().toArray();

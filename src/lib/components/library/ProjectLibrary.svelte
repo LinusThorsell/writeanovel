@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { BookOpen, Cloud, CloudOff, Feather, HardDrive, Plus, UserRound } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
-	import type { WriteABookState } from '$lib/application/writeabook-state.svelte';
+	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
 
-	let { model }: { model: WriteABookState } = $props();
+	let { model }: { model: WriteANovelState } = $props();
 	let creating = $state(false);
 	let title = $state('');
 	let author = $state('');
@@ -37,8 +37,8 @@
 
 <div class="library-page">
 	<header class="site-header">
-		<a class="brand" href={resolve('/')} aria-label="WriteABook home"
-			><span><Feather size={21} /></span><strong>WriteABook</strong></a
+		<a class="brand" href={resolve('/')} aria-label="WriteANovel home"
+			><span><Feather size={21} /></span><strong>WriteANovel</strong></a
 		>
 		<div class="header-actions">
 			<span class:offline={!online} class="connection"

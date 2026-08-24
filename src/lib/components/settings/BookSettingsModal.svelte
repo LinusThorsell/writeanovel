@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { BookImage, Trash2, Upload } from '@lucide/svelte';
 	import { untrack } from 'svelte';
-	import type { WriteABookState } from '$lib/application/writeabook-state.svelte';
+	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import { MEDIA_ACCEPT_ATTRIBUTE } from '$lib/application/media-service';
 	import type { TrimSize, TypographyPreset } from '$lib/domain/types';
 	import Modal from '$lib/components/ui/Modal.svelte';
 
-	let { model }: { model: WriteABookState } = $props();
+	let { model }: { model: WriteANovelState } = $props();
 	const project = untrack(() => model.workspace!.project);
 	let title = $state(project.title);
 	let subtitle = $state(project.subtitle);

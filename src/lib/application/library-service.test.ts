@@ -4,7 +4,7 @@ import { LibraryService } from './library-service';
 import { SyncService } from './sync-service';
 import { createManuscriptDocument, createNovelProject } from '$lib/domain/factories';
 import type { PendingChange } from '$lib/domain/types';
-import { WriteABookDatabase } from '$lib/infrastructure/local/database';
+import { WriteANovelDatabase } from '$lib/infrastructure/local/database';
 import { LocalLibraryRepository } from '$lib/infrastructure/local/local-library-repository';
 
 class RecordingCloud implements CloudLibraryPort {
@@ -39,10 +39,10 @@ class RecordingCloud implements CloudLibraryPort {
 	}
 }
 
-const databases: WriteABookDatabase[] = [];
+const databases: WriteANovelDatabase[] = [];
 
 function services() {
-	const database = new WriteABookDatabase(`writeabook-service-test-${crypto.randomUUID()}`);
+	const database = new WriteANovelDatabase(`writeanovel-service-test-${crypto.randomUUID()}`);
 	databases.push(database);
 	const local = new LocalLibraryRepository(database);
 	const cloud = new RecordingCloud();

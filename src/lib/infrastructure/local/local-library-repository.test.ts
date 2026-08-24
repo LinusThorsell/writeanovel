@@ -4,13 +4,13 @@ import {
 	createNovelProject,
 	createStoryNote
 } from '$lib/domain/factories';
-import { WriteABookDatabase } from './database';
+import { WriteANovelDatabase } from './database';
 import { LocalLibraryRepository } from './local-library-repository';
 
-const databases: WriteABookDatabase[] = [];
+const databases: WriteANovelDatabase[] = [];
 
-function repository(): { database: WriteABookDatabase; library: LocalLibraryRepository } {
-	const database = new WriteABookDatabase(`writeabook-test-${crypto.randomUUID()}`);
+function repository(): { database: WriteANovelDatabase; library: LocalLibraryRepository } {
+	const database = new WriteANovelDatabase(`writeanovel-test-${crypto.randomUUID()}`);
 	databases.push(database);
 	return { database, library: new LocalLibraryRepository(database) };
 }

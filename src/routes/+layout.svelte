@@ -10,7 +10,7 @@
 </script>
 
 <svelte:head>
-	<title>WriteABook</title>
+	<title>WriteANovel</title>
 </svelte:head>
 
 {@render children()}

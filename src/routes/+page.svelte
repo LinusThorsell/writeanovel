@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { AlertCircle, CheckCircle2, X } from '@lucide/svelte';
 	import { onMount } from 'svelte';
-	import { WriteABookState } from '$lib/application/writeabook-state.svelte';
+	import { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import AccountModal from '$lib/components/account/AccountModal.svelte';
 	import ProjectLibrary from '$lib/components/library/ProjectLibrary.svelte';
 	import WorkspaceShell from '$lib/components/workspace/WorkspaceShell.svelte';
 
-	const state = new WriteABookState();
+	const state = new WriteANovelState();
 
 	onMount(() => {
 		state.initialize().catch((error) => {
 			state.loading = false;
-			state.showError(error instanceof Error ? error.message : 'WriteABook could not start.');
+			state.showError(error instanceof Error ? error.message : 'WriteANovel could not start.');
 		});
 	});
 </script>

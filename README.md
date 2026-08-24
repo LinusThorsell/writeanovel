@@ -1,6 +1,6 @@
-# WriteABook
+# WriteANovel
 
-WriteABook is an offline-first novel studio built with Svelte 5, SvelteKit, IndexedDB, and PocketBase. Free writers do not need an account and their manuscripts stay in the browser. Authenticated premium writers can explicitly move their local library to PocketBase while retaining a complete offline cache.
+WriteANovel is an offline-first novel studio built with Svelte 5, SvelteKit, IndexedDB, and PocketBase. Free writers do not need an account and their manuscripts stay in the browser. Authenticated premium writers can explicitly move their local library to PocketBase while retaining a complete offline cache.
 
 ## Start the application
 
@@ -12,7 +12,7 @@ docker compose up --build
 
 Open:
 
-- WriteABook: <http://localhost:3000>
+- WriteANovel: <http://localhost:3000>
 - PocketBase dashboard: <http://localhost:8090/_/>
 
 The first start applies the schema in `pocketbase/pb_migrations`. PocketBase data is persisted in `pocketbase/pb_data` and excluded from Git.
@@ -26,7 +26,7 @@ docker compose down
 For a non-local deployment, copy `.env.example` to `.env` and set:
 
 - `PUBLIC_POCKETBASE_URL` to the browser-reachable PocketBase URL. This value is compiled into the frontend, so rebuild after changing it.
-- `PB_APP_URL` to the browser-reachable WriteABook URL. PocketBase uses it in password-reset links.
+- `PB_APP_URL` to the browser-reachable WriteANovel URL. PocketBase uses it in password-reset links.
 
 ## Storage behavior
 

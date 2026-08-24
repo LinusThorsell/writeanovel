@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { ArrowDown, ArrowUp, Cloud, CloudOff, HardDrive, Trash2 } from '@lucide/svelte';
-	import type { WriteABookState } from '$lib/application/writeabook-state.svelte';
+	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import type { SyncStatus } from '$lib/domain/types';
 	import { richTextToPlainText } from '$lib/export/rich-text-html';
 	import RichTextEditor from '$lib/components/editor/RichTextEditor.svelte';
 
-	let { model }: { model: WriteABookState } = $props();
+	let { model }: { model: WriteANovelState } = $props();
 
 	function commitTitle(event: FocusEvent): void {
 		model.updateActiveTitle((event.currentTarget as HTMLInputElement).value);

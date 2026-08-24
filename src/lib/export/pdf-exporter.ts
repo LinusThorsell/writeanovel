@@ -341,7 +341,7 @@ export async function buildPdfDefinition(
 			title: workspace.project.title,
 			author: workspace.project.author,
 			subject: workspace.project.synopsis,
-			creator: 'WriteABook'
+			creator: 'WriteANovel'
 		}
 	};
 }

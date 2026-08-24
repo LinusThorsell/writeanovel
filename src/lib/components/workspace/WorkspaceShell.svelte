@@ -10,12 +10,12 @@
 		Settings,
 		UserRound
 	} from '@lucide/svelte';
-	import type { WriteABookState } from '$lib/application/writeabook-state.svelte';
+	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import BookSettingsModal from '$lib/components/settings/BookSettingsModal.svelte';
 	import EditorPane from './EditorPane.svelte';
 	import WorkspaceSidebar from './WorkspaceSidebar.svelte';
 
-	let { model }: { model: WriteABookState } = $props();
+	let { model }: { model: WriteANovelState } = $props();
 	let sidebarOpen = $state(false);
 	let exportOpen = $state(false);
 
@@ -41,7 +41,7 @@
 				aria-label="Open novel contents"
 				onclick={() => (sidebarOpen = !sidebarOpen)}><PanelLeft size={19} /></button
 			>
-			<strong>WriteABook</strong>
+			<strong>WriteANovel</strong>
 		</div>
 
 		<div class="topbar-actions">

@@ -36,7 +36,7 @@
 	}
 </script>
 
-<svelte:head><title>Reset password · WriteABook</title></svelte:head>
+<svelte:head><title>Reset password · WriteANovel</title></svelte:head>
 
 <main>
 	<section>
@@ -45,10 +45,10 @@
 		</div>
 		{#if complete}
 			<h1>Password changed</h1>
-			<p>Your new password is ready. You can return to WriteABook and sign in.</p>
-			<a class="button button-primary" href={resolve('/')}>Return to WriteABook</a>
+			<p>Your new password is ready. You can return to WriteANovel and sign in.</p>
+			<a class="button button-primary" href={resolve('/')}>Return to WriteANovel</a>
 		{:else}
-			<p class="eyebrow">WriteABook account</p>
+			<p class="eyebrow">WriteANovel account</p>
 			<h1>Choose a new password</h1>
 			<p>
 				Use at least eight characters. A longer phrase is easier to remember and harder to guess.

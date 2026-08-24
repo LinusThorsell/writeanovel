@@ -4,7 +4,7 @@
 import { build, files, prerendered, version } from '$service-worker';
 
 const worker: ServiceWorkerGlobalScope = self;
-const cacheName = `writeabook-${version}`;
+const cacheName = `writeanovel-${version}`;
 const applicationAssets = [...build, ...files, ...prerendered];
 
 worker.addEventListener('install', (event) => {

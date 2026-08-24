@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { Check, Cloud, HardDrive, LogOut, Mail, Sparkles, UserRound } from '@lucide/svelte';
-	import type { WriteABookState } from '$lib/application/writeabook-state.svelte';
+	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
 
-	let { model }: { model: WriteABookState } = $props();
+	let { model }: { model: WriteANovelState } = $props();
 	let mode = $state<'login' | 'register' | 'forgot'>('login');
 	let email = $state('');
 	let password = $state('');
