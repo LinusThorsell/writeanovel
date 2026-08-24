@@ -69,5 +69,4 @@ export interface AccountPort {
 	logout(): void;
 	requestPasswordReset(email: string): Promise<void>;
 	confirmPasswordReset(token: string, password: string): Promise<void>;
-	setPremium(isPremium: boolean): Promise<AuthenticatedUser>;
 }

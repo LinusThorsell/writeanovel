@@ -401,7 +401,7 @@ export class WriteANovelState {
 		try {
 			this.user = await this.accounts.register({ email, password, displayName });
 			this.library.configureUser(this.user);
-			this.showNotice('Account created. Premium is ready to enable.');
+			this.showNotice('Account created. Your novels are still saved on this device.');
 		} finally {
 			this.working = false;
 		}
@@ -415,13 +415,12 @@ export class WriteANovelState {
 		this.showNotice('Signed out. Your local books are still here.');
 	}
 
-	async setPremium(isPremium: boolean, migrate: boolean): Promise<void> {
+	async migrateLocalLibrary(): Promise<void> {
 		this.working = true;
 		try {
-			this.user = await this.accounts.setPremium(isPremium);
-			this.library.configureUser(this.user);
-			if (isPremium && migrate) await this.library.migrateLocalProjects();
-			this.showNotice(isPremium ? 'Premium cloud storage is on.' : 'Using local storage only.');
+			await this.library.migrateLocalProjects();
+			await this.reloadAfterCloudChange();
+			this.showNotice('Your local novels are now available in the cloud.');
 		} finally {
 			this.working = false;
 		}

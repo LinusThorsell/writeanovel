@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check, Cloud, HardDrive, LogOut, Mail, Sparkles, UserRound } from '@lucide/svelte';
+	import { Check, Cloud, HardDrive, LogOut, Mail, UserRound } from '@lucide/svelte';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
 
@@ -8,7 +8,6 @@
 	let email = $state('');
 	let password = $state('');
 	let displayName = $state('');
-	let migrateLocal = $state(true);
 	let formError = $state<string>();
 
 	async function submit(event: SubmitEvent): Promise<void> {
@@ -24,12 +23,12 @@
 		}
 	}
 
-	async function changePremium(isPremium: boolean): Promise<void> {
+	async function migrateLocalLibrary(): Promise<void> {
 		formError = undefined;
 		try {
-			await model.setPremium(isPremium, isPremium && migrateLocal);
+			await model.migrateLocalLibrary();
 		} catch (error) {
-			formError = error instanceof Error ? error.message : 'Premium mode could not be changed.';
+			formError = error instanceof Error ? error.message : 'Local novels could not be moved.';
 		}
 	}
 </script>
@@ -64,16 +63,17 @@
 			</div>
 			<div class="account-actions">
 				<button
+					class="button button-primary"
+					type="button"
+					disabled={model.working}
+					onclick={migrateLocalLibrary}
+					>{model.working ? 'Moving…' : 'Move local novels to cloud'}</button
+				>
+				<button
 					class="button button-secondary"
 					type="button"
 					disabled={model.working}
 					onclick={() => model.syncNow()}>Sync now</button
-				>
-				<button
-					class="button button-quiet"
-					type="button"
-					disabled={model.working}
-					onclick={() => changePremium(false)}>Use local storage only</button
 				>
 			</div>
 		{:else}
@@ -86,25 +86,10 @@
 					</p>
 				</div>
 			</div>
-			<label class="migration-choice">
-				<input type="checkbox" bind:checked={migrateLocal} />
-				<span
-					><strong>Move my existing local novels to the cloud</strong><small
-						>A copy remains cached here for offline writing.</small
-					></span
-				>
-			</label>
-			<button
-				class="button button-primary premium-button"
-				type="button"
-				disabled={model.working}
-				onclick={() => changePremium(true)}
-				><Sparkles size={17} />{model.working ? 'Enabling…' : 'Enable premium demo'}</button
-			>
-			<p class="developer-note">
-				This temporary control changes the user’s <code>is_premium</code> flag. Your payment flow can
-				replace it later.
-			</p>
+			<div class="access-note">
+				<strong>Premium access is invite-only during this demo.</strong>
+				<p>Your novels remain local unless the site administrator enables cloud access.</p>
+			</div>
 		{/if}
 
 		{#if formError}<p class="form-error" role="alert">{formError}</p>{/if}
@@ -278,45 +263,23 @@
 		margin-top: 1rem;
 	}
 
-	.migration-choice {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.65rem;
-		margin: 1rem 0;
+	.access-note {
+		margin-top: 1rem;
 		padding: 0.85rem;
 		background: white;
 		border: 1px solid var(--line);
 		border-radius: 0.65rem;
-		cursor: pointer;
 	}
 
-	.migration-choice input {
-		margin-top: 0.2rem;
-	}
-
-	.migration-choice strong,
-	.migration-choice small {
-		display: block;
-	}
-
-	.migration-choice strong {
+	.access-note strong {
 		font-size: 0.82rem;
 	}
 
-	.migration-choice small {
+	.access-note p {
 		margin-top: 0.2rem;
 		color: var(--ink-soft);
-	}
-
-	.premium-button {
-		width: 100%;
-	}
-
-	.developer-note {
-		margin: 0.7rem 0 0;
-		color: var(--ink-soft);
-		font-size: 0.68rem;
-		text-align: center;
+		font-size: 0.75rem;
+		line-height: 1.45;
 	}
 
 	.sign-out,

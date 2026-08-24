@@ -44,8 +44,7 @@ export class PocketBaseAccountService implements AccountPort {
 			email: input.email.trim().toLowerCase(),
 			password: input.password,
 			passwordConfirm: input.password,
-			display_name: input.displayName.trim(),
-			is_premium: false
+			display_name: input.displayName.trim()
 		});
 
 		return this.login(input.email, input.password);
@@ -83,16 +82,5 @@ export class PocketBaseAccountService implements AccountPort {
 
 	async confirmPasswordReset(token: string, password: string): Promise<void> {
 		await this.client.collection('users').confirmPasswordReset(token, password, password);
-	}
-
-	async setPremium(isPremium: boolean): Promise<AuthenticatedUser> {
-		const user = this.currentUser();
-		if (!user) throw new Error('Sign in before changing premium access.');
-
-		const record = await this.client.collection<UserRecord>('users').update(user.id, {
-			is_premium: isPremium
-		});
-		this.client.authStore.save(this.client.authStore.token, record);
-		return toUser(record);
 	}
 }

@@ -54,10 +54,11 @@ After production deployment, submit `https://writeanovel.linus.solutions/sitemap
 ### Premium mode
 
 - Uses PocketBase email/password registration and login.
-- The account modal contains the temporary `is_premium` development toggle; a payment flow can replace that mutation later.
-- Enabling premium presents an explicit local-to-cloud migration choice.
+- The `is_premium` flag can only be changed by a PocketBase superuser, such as through the dashboard.
+- Normal account creation and update requests cannot submit or change `is_premium`.
+- After an administrator enables premium, the account modal presents an explicit local-to-cloud migration action.
 - PocketBase is authoritative after migration. IndexedDB remains the full offline cache and an outbox queues offline edits.
-- Disabling premium stops cloud traffic but leaves the device copy intact.
+- If an administrator disables premium, cloud traffic stops after the next authentication refresh while the device copy remains intact.
 
 Password-reset requests need SMTP configured in the PocketBase dashboard before email can be delivered. The reset confirmation screen is served at `/reset-password`.
 
@@ -96,12 +97,14 @@ npm run test:e2e
 npm run build
 ```
 
-`npm test` runs the unit and standard browser suites together. The premium test intentionally requires the live Compose backend:
+`npm test` runs the unit and standard browser suites together. The premium test intentionally requires the live Compose backend and dedicated test superuser credentials. The supplied PocketBase image creates or updates that superuser from these environment variables:
 
 ```sh
-docker compose up -d --build
-PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 POCKETBASE_E2E=true npm run test:e2e -- tests/e2e/account.spec.ts
+PB_ADMIN_EMAIL=e2e-admin@example.test PB_ADMIN_PASSWORD=a-secure-test-password docker compose up -d --build
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 POCKETBASE_E2E=true PB_ADMIN_EMAIL=e2e-admin@example.test PB_ADMIN_PASSWORD=a-secure-test-password npm run test:e2e -- tests/e2e/account.spec.ts
 ```
+
+Use different strong credentials for a deployed instance and keep them out of version control.
 
 The permanent Playwright scenarios cover:
 
@@ -111,7 +114,7 @@ The permanent Playwright scenarios cover:
 - visible PDF page-number ranges, formatting, placement, and local/cloud persistence;
 - front/back pages, PNG/SVG covers, inline SVG alignment and resizing, and resize persistence;
 - service-worker installation and continued writing after the browser is put offline;
-- registration, explicit premium migration, and restoration from PocketBase in a fresh browser profile.
+- rejection of self-service premium upgrades, administrator-assigned premium migration, and restoration from PocketBase in a fresh browser profile.
 
 ## Architecture
 

@@ -71,7 +71,7 @@ describe('storage routing', () => {
 		expect(cloud.pushes).toHaveLength(0);
 	});
 
-	it('explicitly migrates all local records after premium is enabled', async () => {
+	it('explicitly migrates all local records after premium is assigned', async () => {
 		const { cloud, service } = services();
 		const project = createNovelProject({ title: 'Cloud book', author: '' });
 		const chapter = createManuscriptDocument({
