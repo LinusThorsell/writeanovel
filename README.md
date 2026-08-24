@@ -12,7 +12,8 @@ docker compose up --build
 
 Open:
 
-- WriteANovel: <http://localhost:3000>
+- WriteANovel marketing site: <http://localhost:3000>
+- Writing studio: <http://localhost:3000/app>
 - PocketBase dashboard: <http://localhost:8090/_/>
 
 The first start applies the schema in `pocketbase/pb_migrations`. PocketBase data is persisted in `pocketbase/pb_data` and excluded from Git.
@@ -27,6 +28,20 @@ For a non-local deployment, copy `.env.example` to `.env` and set:
 
 - `PUBLIC_POCKETBASE_URL` to the browser-reachable PocketBase URL. This value is compiled into the frontend, so rebuild after changing it.
 - `PB_APP_URL` to the browser-reachable WriteANovel URL. PocketBase uses it in password-reset links.
+- `ORIGIN` to the public application origin expected by the SvelteKit Node server.
+
+The public SEO origin is `https://writeanovel.linus.solutions`. Canonical URLs, social metadata, structured data, `robots.txt`, and `sitemap.xml` use that origin from `src/lib/marketing/site.ts`.
+
+## Public site and search visibility
+
+- `/` is a prerendered marketing page for novel writing software.
+- `/features`, `/offline-novel-writing`, `/novel-planning`, and `/book-typesetting` are substantive, internally linked search landing pages.
+- Public marketing routes are server-rendered at build time and ship without client-side JavaScript.
+- Each public page has a unique title and description, canonical URL, Open Graph and Twitter metadata, and JSON-LD structured data.
+- `/app` and `/reset-password` carry `noindex` directives and are intentionally excluded from the sitemap.
+- The installable PWA opens `/app` directly while keeping public pages crawlable at their own URLs.
+
+After production deployment, submit `https://writeanovel.linus.solutions/sitemap.xml` in Google Search Console and validate the homepage with Google's Rich Results Test. Ranking is driven primarily by useful content, genuine references from other sites, and sustained performance; the technical setup makes the site eligible to be crawled and understood.
 
 ## Storage behavior
 
@@ -57,6 +72,7 @@ Password-reset requests need SMTP configured in the PocketBase dashboard before 
 - Trim-size and typography presets; 6 × 9 inches and Libre Baskerville are the defaults.
 - Direct PDF download and EPUB 3 download, including book pages, artwork, and covers.
 - Installable offline PWA behavior.
+- Prerendered public marketing pages with production SEO and social-sharing metadata.
 
 ## Development
 
@@ -88,6 +104,7 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 POCKETBASE_E2E=true npm run test:e2e -
 
 The permanent Playwright scenarios cover:
 
+- server-rendered marketing copy, unique metadata, canonical URLs, structured data, sitemap, robots policy, and private-route `noindex` behavior;
 - local project creation, chapter insertion, notes, reload persistence, and zero anonymous backend requests;
 - direct PDF and EPUB downloads;
 - front/back pages, PNG/SVG covers, inline SVG alignment and resizing, and resize persistence;

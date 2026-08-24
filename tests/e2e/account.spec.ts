@@ -8,7 +8,7 @@ test('migrates a local novel and restores it after premium login on a fresh devi
 		process.env.POCKETBASE_E2E !== 'true',
 		'Set POCKETBASE_E2E=true when running against Docker Compose.'
 	);
-	await page.goto('/');
+	await page.goto('/app');
 	await page.getByRole('button', { name: 'Create your first novel' }).click();
 	await page.getByLabel('Novel title').fill('Migrated Lighthouse');
 	await page.getByRole('button', { name: 'Create novel', exact: true }).click();
@@ -33,7 +33,7 @@ test('migrates a local novel and restores it after premium login on a fresh devi
 	});
 	try {
 		const cloudPage = await cloudContext.newPage();
-		await cloudPage.goto('/');
+		await cloudPage.goto('/app');
 		await expect(cloudPage.getByText('0 projects')).toBeVisible();
 		await cloudPage.getByRole('button', { name: 'Premium' }).click();
 		await cloudPage.getByLabel('Email').fill(email);

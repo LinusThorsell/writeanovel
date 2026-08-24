@@ -36,7 +36,10 @@
 	}
 </script>
 
-<svelte:head><title>Reset password · WriteANovel</title></svelte:head>
+<svelte:head>
+	<title>Reset password | WriteANovel</title>
+	<meta name="robots" content="noindex, nofollow, noarchive" />
+</svelte:head>
 
 <main>
 	<section>
@@ -46,7 +49,7 @@
 		{#if complete}
 			<h1>Password changed</h1>
 			<p>Your new password is ready. You can return to WriteANovel and sign in.</p>
-			<a class="button button-primary" href={resolve('/')}>Return to WriteANovel</a>
+			<a class="button button-primary" href={resolve('/app')}>Return to the writing studio</a>
 		{:else}
 			<p class="eyebrow">WriteANovel account</p>
 			<h1>Choose a new password</h1>

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 async function clearLocalLibrary(page: import('@playwright/test').Page): Promise<void> {
-	await page.goto('/');
+	await page.goto('/app');
 	await page.evaluate(
 		() =>
 			new Promise<void>((resolve) => {
@@ -27,7 +27,7 @@ async function createNovel(
 
 test.beforeEach(async ({ page }) => {
 	await clearLocalLibrary(page);
-	await expect(page).toHaveTitle('WriteANovel');
+	await expect(page).toHaveTitle('Writing Studio | WriteANovel');
 	await expect(page.getByRole('link', { name: 'WriteANovel home' })).toContainText('WriteANovel');
 });
 

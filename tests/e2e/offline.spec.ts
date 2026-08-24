@@ -4,7 +4,7 @@ test('installed app reloads and keeps writing with the network disabled', async 
 	context,
 	page
 }) => {
-	await page.goto('/');
+	await page.goto('/app');
 	await page.evaluate(
 		() =>
 			new Promise<void>((resolve) => {

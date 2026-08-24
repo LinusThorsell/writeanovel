@@ -9,8 +9,4 @@
 	let { children }: { children: Snippet } = $props();
 </script>
 
-<svelte:head>
-	<title>WriteANovel</title>
-</svelte:head>
-
 {@render children()}

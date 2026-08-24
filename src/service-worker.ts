@@ -43,7 +43,8 @@ worker.addEventListener('fetch', (event) => {
 			} catch (error) {
 				if (cached) return cached;
 				if (event.request.mode === 'navigate') {
-					const shell = await cache.match('/');
+					const fallbackPath = requestUrl.pathname.startsWith('/app') ? '/app' : '/';
+					const shell = await cache.match(fallbackPath);
 					if (shell) return shell;
 				}
 				throw error;

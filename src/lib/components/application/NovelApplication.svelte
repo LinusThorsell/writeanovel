@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { AlertCircle, CheckCircle2, X } from '@lucide/svelte';
 	import { onMount } from 'svelte';
+	import { AlertCircle, CheckCircle2, X } from '@lucide/svelte';
 	import { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import AccountModal from '$lib/components/account/AccountModal.svelte';
 	import ProjectLibrary from '$lib/components/library/ProjectLibrary.svelte';
