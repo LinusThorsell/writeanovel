@@ -10,6 +10,7 @@ import { chapterNumber, documentsOfKind, moveDocument, nextPosition } from '$lib
 import type {
 	AuthenticatedUser,
 	ChapterHeadingSettings,
+	PageNumberingSettings,
 	DocumentKind,
 	ManuscriptDocument,
 	MatterType,
@@ -356,6 +357,7 @@ export class WriteANovelState {
 		trimSize: TrimSize;
 		typography: TypographyPreset;
 		chapterHeading: ChapterHeadingSettings;
+		pageNumbering: PageNumberingSettings;
 	}): Promise<void> {
 		if (!this.workspace) return;
 		const project = {

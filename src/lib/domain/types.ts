@@ -30,12 +30,27 @@ export type MatterType =
 export type NoteKind = 'character' | 'environment' | 'plotline' | 'planning';
 export type TrimSize = 'trade-6x9' | 'a5' | 'letter';
 export type TypographyPreset = 'literary' | 'classic' | 'modern';
+export type PageNumberCountMode = 'restart' | 'continue';
+export type PageNumberNumeralStyle = 'arabic' | 'roman';
+export type PageNumberPlacement =
+	'bottom-left' | 'bottom-center' | 'bottom-right' | 'bottom-inside' | 'bottom-outside';
 export type LibraryEntityType = 'project' | 'document' | 'note' | 'asset';
 
 export type ChapterHeadingSettings = {
 	showLabel: boolean;
 	labelTemplate: string;
 	showTitle: boolean;
+};
+
+export type PageNumberingSettings = {
+	enabled: boolean;
+	startDocumentId: string;
+	endDocumentId: string;
+	countMode: PageNumberCountMode;
+	restartAt: number;
+	numeralStyle: PageNumberNumeralStyle;
+	template: string;
+	placement: PageNumberPlacement;
 };
 
 export type NovelProject = {
@@ -47,6 +62,7 @@ export type NovelProject = {
 	trimSize: TrimSize;
 	typography: TypographyPreset;
 	chapterHeading?: ChapterHeadingSettings;
+	pageNumbering?: PageNumberingSettings;
 	frontCoverAssetId?: string;
 	backCoverAssetId?: string;
 	createdAt: string;

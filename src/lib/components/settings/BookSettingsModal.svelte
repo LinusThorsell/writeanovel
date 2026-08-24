@@ -4,12 +4,20 @@
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import { MEDIA_ACCEPT_ATTRIBUTE } from '$lib/application/media-service';
 	import { bookChapterHeading } from '$lib/domain/chapter-headings';
-	import type { ChapterHeadingSettings, TrimSize, TypographyPreset } from '$lib/domain/types';
+	import { bookPageNumbering } from '$lib/domain/page-numbering';
+	import type {
+		ChapterHeadingSettings,
+		PageNumberingSettings,
+		TrimSize,
+		TypographyPreset
+	} from '$lib/domain/types';
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import ChapterHeadingBuilder from './ChapterHeadingBuilder.svelte';
+	import PageNumberingBuilder from './PageNumberingBuilder.svelte';
 
 	let { model }: { model: WriteANovelState } = $props();
 	const project = untrack(() => model.workspace!.project);
+	const documents = untrack(() => model.workspace!.documents);
 	let title = $state(project.title);
 	let subtitle = $state(project.subtitle);
 	let author = $state(project.author);
@@ -17,6 +25,7 @@
 	let trimSize = $state<TrimSize>(project.trimSize);
 	let typography = $state<TypographyPreset>(project.typography);
 	let chapterHeading = $state<ChapterHeadingSettings>({ ...bookChapterHeading(project) });
+	let pageNumbering = $state<PageNumberingSettings>({ ...bookPageNumbering(project, documents)! });
 	let savingCover = $state<'front' | 'back'>();
 
 	function coverUrl(side: 'front' | 'back'): string | undefined {
@@ -50,7 +59,8 @@
 			synopsis,
 			trimSize,
 			typography,
-			chapterHeading: { ...chapterHeading }
+			chapterHeading: { ...chapterHeading },
+			pageNumbering: { ...pageNumbering }
 		});
 	}
 
@@ -111,9 +121,6 @@
 					onChange={(value) => (chapterHeading = value)}
 				/>
 			</div>
-			<button class="button button-primary save" type="button" onclick={save}
-				>Save book settings</button
-			>
 		</section>
 
 		<section class="covers">
@@ -151,6 +158,20 @@
 			</div>
 		</section>
 	</div>
+
+	<section class="heading-settings page-numbering-settings">
+		<div>
+			<h3>Page numbering</h3>
+			<p>Choose which book pages are numbered and how each number appears.</p>
+		</div>
+		<PageNumberingBuilder
+			value={pageNumbering}
+			{documents}
+			onChange={(value) => (pageNumbering = value)}
+		/>
+	</section>
+	<button class="button button-primary save" type="button" onclick={save}>Save book settings</button
+	>
 
 	<div class="danger-zone">
 		<div>
@@ -211,6 +232,10 @@
 		margin: 0;
 		color: var(--ink-soft);
 		font-size: 0.74rem;
+	}
+
+	.page-numbering-settings {
+		margin-top: 1.6rem;
 	}
 
 	.covers > p {

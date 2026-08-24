@@ -284,6 +284,79 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	expect((await epubDownload).suggestedFilename()).toBe('exportable-story.epub');
 });
 
+test('configures a visible document range, sequence, numeral style, template, and position for PDF page numbers', async ({
+	page
+}) => {
+	await createNovel(page, 'Numbered Story');
+	await page.getByLabel('Page title').fill('The Opening');
+	await page.getByLabel('Page title').press('Enter');
+	await page.locator('.writing-surface').fill('The first numbered chapter.');
+	await page.waitForTimeout(700);
+
+	await page.getByLabel('Add a front page').click();
+	await page.getByRole('button', { name: 'Title page', exact: true }).click();
+	await expect(page.getByLabel('Page title')).toHaveValue('Title page');
+	await page.locator('.writing-surface').fill('This front page is outside the numbered range.');
+	await page.waitForTimeout(700);
+
+	await page.getByRole('button', { name: /1 The Opening/ }).click();
+	await page.getByRole('button', { name: 'Insert chapter after The Opening' }).click();
+	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 2');
+	await page.getByLabel('Page title').fill('The Crossing');
+	await page.getByLabel('Page title').press('Enter');
+	await page.locator('.writing-surface').fill('The second numbered chapter.');
+	await page.waitForTimeout(700);
+
+	await page.getByLabel('Add a back page').click();
+	await page.getByRole('button', { name: 'About the author', exact: true }).click();
+	await expect(page.getByLabel('Page title')).toHaveValue('About the author');
+	await page.locator('.writing-surface').fill('This back page is outside the numbered range.');
+	await page.waitForTimeout(700);
+
+	await page.getByRole('button', { name: 'Book settings' }).click();
+	await page.getByLabel('Start numbering at').selectOption({ label: 'Chapter 1 — The Opening' });
+	await page.getByLabel('Stop numbering after').selectOption({ label: 'Chapter 2 — The Crossing' });
+	await page.getByLabel('Numbering sequence').selectOption('restart');
+	await page.getByLabel('Restart page numbering at').fill('7');
+	await page.getByLabel('Page number style').selectOption('roman');
+	await page.getByLabel('Page number position').selectOption('bottom-center');
+	await page.getByLabel('Page number text').fill('Folio {number}');
+	await expect(page.getByLabel('Page number preview')).toContainText('Folio vii');
+	await page.getByRole('button', { name: 'Save book settings' }).click();
+
+	await page.reload();
+	await page.getByRole('button', { name: 'Book settings' }).click();
+	await expect(page.getByLabel('Start numbering at')).toHaveValue(
+		(await page
+			.getByLabel('Start numbering at')
+			.locator('option', { hasText: 'The Opening' })
+			.getAttribute('value')) ?? ''
+	);
+	await expect(page.getByLabel('Restart page numbering at')).toHaveValue('7');
+	await expect(page.getByLabel('Page number style')).toHaveValue('roman');
+	await expect(page.getByLabel('Page number position')).toHaveValue('bottom-center');
+	await expect(page.getByLabel('Page number text')).toHaveValue('Folio {number}');
+	await page.getByRole('button', { name: 'Save book settings' }).click();
+
+	await page.getByText('Export', { exact: true }).click();
+	const pdfDownload = page.waitForEvent('download');
+	await page.getByRole('button', { name: /PDF/ }).click();
+	const pdfPath = await (await pdfDownload).path();
+	if (!pdfPath) throw new Error('The numbered PDF was not available for verification.');
+	const extracted = await extractTextItems(new Uint8Array(await readFile(pdfPath)));
+	expect(extracted.totalPages).toBe(4);
+	const pageText = extracted.items.map((items) => items.map((item) => item.str).join(' '));
+	expect(pageText[0]).not.toContain('Folio');
+	expect(pageText[1]).toContain('Folio vii');
+	expect(pageText[2]).toContain('Folio viii');
+	expect(pageText[3]).not.toContain('Folio');
+	const firstFolio = extracted.items[1].find((item) => item.str.includes('Folio vii'));
+	if (!firstFolio) throw new Error('The visible page number could not be positioned.');
+	expect(Math.abs(firstFolio.x + firstFolio.width / 2 - 216)).toBeLessThan(6);
+	expect(firstFolio.y).toBeGreaterThan(20);
+	expect(firstFolio.y).toBeLessThan(50);
+});
+
 test('uses book-wide chapter headings with persistent per-chapter overrides in the editor and PDF', async ({
 	page
 }) => {

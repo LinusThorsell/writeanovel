@@ -15,6 +15,14 @@ export function documentsOfKind(
 	return sortDocuments(documents.filter((document) => document.kind === kind));
 }
 
+export function manuscriptDocuments(documents: ManuscriptDocument[]): ManuscriptDocument[] {
+	return [
+		...documentsOfKind(documents, 'front-matter'),
+		...documentsOfKind(documents, 'chapter'),
+		...documentsOfKind(documents, 'back-matter')
+	];
+}
+
 export function nextPosition(
 	documents: ManuscriptDocument[],
 	kind: DocumentKind,

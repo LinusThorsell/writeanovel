@@ -71,6 +71,7 @@ Password-reset requests need SMTP configured in the PocketBase dashboard before 
 - Raster image and SVG insertion, alignment, and drag-to-resize controls.
 - Trim-size and typography presets; 6 × 9 inches and Libre Baskerville are the defaults.
 - Direct PDF download and EPUB 3 download, including book pages, artwork, and covers.
+- Configurable PDF page-number ranges, restart/continuous sequences, Arabic/Roman numerals, templates, and placement.
 - Installable offline PWA behavior.
 - Prerendered public marketing pages with production SEO and social-sharing metadata.
 
@@ -107,6 +108,7 @@ The permanent Playwright scenarios cover:
 - server-rendered marketing copy, unique metadata, canonical URLs, structured data, sitemap, robots policy, and private-route `noindex` behavior;
 - local project creation, chapter insertion, notes, reload persistence, and zero anonymous backend requests;
 - direct PDF and EPUB downloads;
+- visible PDF page-number ranges, formatting, placement, and local/cloud persistence;
 - front/back pages, PNG/SVG covers, inline SVG alignment and resizing, and resize persistence;
 - service-worker installation and continued writing after the browser is put offline;
 - registration, explicit premium migration, and restoration from PocketBase in a fresh browser profile.

@@ -4,9 +4,11 @@ import type {
 	Alignment,
 	Content,
 	ContentImage,
+	ContentSection,
 	ContentStack,
 	ContentSvg,
 	ContentText,
+	DynamicContent,
 	TDocumentDefinitions
 } from 'pdfmake/interfaces';
 import literaryRegularUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-400-normal.woff?url';
@@ -14,10 +16,18 @@ import literaryItalicUrl from '@fontsource/libre-baskerville/files/libre-baskerv
 import literaryBoldUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-700-normal.woff?url';
 import literaryBoldItalicUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-700-italic.woff?url';
 import manropeUrl from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?url';
-import { documentsOfKind } from '$lib/domain/ordering';
+import { manuscriptDocuments } from '$lib/domain/ordering';
+import {
+	bookPageNumbering,
+	displayedPageNumber,
+	numberedDocumentIds,
+	pageNumberAlignment,
+	pageNumberText
+} from '$lib/domain/page-numbering';
 import type {
 	JsonValue,
 	MediaAsset,
+	PageNumberingSettings,
 	RichTextMark,
 	RichTextNode,
 	WorkspaceSnapshot
@@ -346,6 +356,32 @@ function manuscriptHeadingContent(
 	};
 }
 
+function configuredPageNumberFooter(
+	settings: PageNumberingSettings,
+	page: (typeof BOOK_PAGE_METRICS)[keyof typeof BOOK_PAGE_METRICS],
+	frontCoverPageCount: number
+): DynamicContent {
+	let firstNumberedPhysicalPage: number | undefined;
+	return (currentPage) => {
+		firstNumberedPhysicalPage ??= currentPage;
+		const number = displayedPageNumber(
+			settings,
+			currentPage,
+			firstNumberedPhysicalPage,
+			frontCoverPageCount
+		);
+		const manuscriptPage = currentPage - frontCoverPageCount;
+		return {
+			text: pageNumberText(settings, number),
+			alignment: pageNumberAlignment(settings.placement, manuscriptPage),
+			font: 'Manrope',
+			fontSize: 8.5,
+			color: '#3f4843',
+			margin: [page.marginInline, 8, page.marginInline, 0]
+		};
+	};
+}
+
 export async function buildPdfDefinition(
 	workspace: WorkspaceSnapshot
 ): Promise<TDocumentDefinitions> {
@@ -355,29 +391,30 @@ export async function buildPdfDefinition(
 	const preparedAssets = await prepareAssets(workspace.assets);
 	const contentWidth = page.width - page.marginInline * 2;
 	const contentHeight = page.height - page.marginBlock * 2;
-	const content: Content[] = [];
+	const content: ContentSection[] = [];
 	const frontCoverId = workspace.project.frontCoverAssetId;
 	const frontCover = frontCoverId ? preparedAssets.get(frontCoverId) : undefined;
 	if (frontCover) {
-		content.push(coverContent(frontCover, contentWidth, contentHeight));
+		content.push({
+			section: coverContent(frontCover, contentWidth, contentHeight),
+			footer: null
+		});
 	}
 
-	const documents = [
-		...documentsOfKind(workspace.documents, 'front-matter'),
-		...documentsOfKind(workspace.documents, 'chapter'),
-		...documentsOfKind(workspace.documents, 'back-matter')
-	];
+	const documents = manuscriptDocuments(workspace.documents);
+	const pageNumbering = bookPageNumbering(workspace.project, workspace.documents);
+	const numberedIds = pageNumbering
+		? numberedDocumentIds(pageNumbering, workspace.documents)
+		: new Set<string>();
+	const pageNumberFooter = pageNumbering
+		? configuredPageNumberFooter(pageNumbering, page, frontCover ? 1 : 0)
+		: null;
 
 	for (const manuscriptDocument of documents) {
-		content.push(
-			manuscriptHeadingContent(
-				workspace,
-				manuscriptDocument,
-				typography,
-				content.length > 0 ? 'before' : undefined
-			)
-		);
-		content.push(
+		const sectionContent: Content[] = [
+			manuscriptHeadingContent(workspace, manuscriptDocument, typography, undefined)
+		];
+		sectionContent.push(
 			...blockContent(manuscriptDocument.body, {
 				assets: preparedAssets,
 				contentWidth,
@@ -386,14 +423,19 @@ export async function buildPdfDefinition(
 				previousBlock: undefined
 			})
 		);
+		content.push({
+			section: sectionContent,
+			footer: numberedIds.has(manuscriptDocument.id) ? pageNumberFooter : null
+		});
 	}
 
 	const backCoverId = workspace.project.backCoverAssetId;
 	const backCover = backCoverId ? preparedAssets.get(backCoverId) : undefined;
 	if (backCover) {
-		const cover = coverContent(backCover, contentWidth, contentHeight);
-		cover.pageBreak = 'before';
-		content.push(cover);
+		content.push({
+			section: coverContent(backCover, contentWidth, contentHeight),
+			footer: null
+		});
 	}
 
 	return {
@@ -437,17 +479,6 @@ export async function buildPdfDefinition(
 				lineHeight: BOOK_LAYOUT.headingLineHeight
 			}
 		},
-		footer: (currentPage, pageCount) => ({
-			text:
-				(frontCover && currentPage === 1) || (backCover && currentPage === pageCount)
-					? ''
-					: `Page ${currentPage}`,
-			alignment: 'right',
-			font: 'Manrope',
-			fontSize: 7,
-			color: '#777d79',
-			margin: [page.marginInline, 12, page.marginInline, 0]
-		}),
 		info: {
 			title: workspace.project.title,
 			author: workspace.project.author,
