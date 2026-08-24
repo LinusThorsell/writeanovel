@@ -58,6 +58,7 @@
 		border-radius: 0.7rem;
 		box-shadow: 0 12px 40px rgb(14 24 20 / 32%);
 		font-size: 0.78rem;
+		pointer-events: none;
 	}
 
 	.toast.error {
@@ -74,6 +75,7 @@
 		background: transparent;
 		border: 0;
 		border-radius: 0.35rem;
+		pointer-events: auto;
 	}
 
 	.toast button:hover {

@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { extractTextItems } from 'unpdf';
 
 async function clearLocalLibrary(page: import('@playwright/test').Page): Promise<void> {
 	await page.goto('/app');
@@ -217,13 +219,64 @@ test('anonymous free writing makes no PocketBase requests', async ({ page }) => 
 
 test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	await createNovel(page, 'Exportable Story');
+	await page.getByLabel('Page title').fill('The Lantern Room');
+	await page.getByLabel('Page title').press('Enter');
 	await page.locator('.writing-surface').fill('A short chapter for export.');
 	await page.waitForTimeout(700);
+
+	const typesetHeading = page.getByLabel('Typeset page heading');
+	await expect(typesetHeading).toContainText('Chapter 1');
+	await expect(typesetHeading).toContainText('The Lantern Room');
+	const editorTypesettingMatches = await page.evaluate(() => {
+		const heading = document.querySelector<HTMLElement>('.typeset-document-heading');
+		const title = heading?.querySelector<HTMLElement>('h1');
+		const body = document.querySelector<HTMLElement>('.writing-surface p');
+		const pageSheet = document.querySelector<HTMLElement>('.page-sheet');
+		const writingSurface = document.querySelector<HTMLElement>('.writing-surface');
+		if (!heading || !title || !body || !pageSheet || !writingSurface) return false;
+
+		const headingBounds = heading.getBoundingClientRect();
+		const titleBounds = title.getBoundingClientRect();
+		const bodyBounds = body.getBoundingClientRect();
+		const pageBounds = pageSheet.getBoundingClientRect();
+		const headingStyle = getComputedStyle(heading);
+		const bodyStyle = getComputedStyle(writingSurface);
+		return (
+			headingBounds.top > pageBounds.top &&
+			headingBounds.bottom < bodyBounds.top &&
+			bodyBounds.bottom < pageBounds.bottom &&
+			Math.abs(
+				titleBounds.left + titleBounds.width / 2 - (pageBounds.left + pageBounds.width / 2)
+			) < 1 &&
+			headingStyle.fontFamily === bodyStyle.fontFamily
+		);
+	});
+	expect(editorTypesettingMatches).toBe(true);
 
 	await page.getByText('Export', { exact: true }).click();
 	const pdfDownload = page.waitForEvent('download');
 	await page.getByRole('button', { name: /PDF/ }).click();
-	expect((await pdfDownload).suggestedFilename()).toBe('exportable-story.pdf');
+	const downloadedPdf = await pdfDownload;
+	expect(downloadedPdf.suggestedFilename()).toBe('exportable-story.pdf');
+	const pdfPath = await downloadedPdf.path();
+	if (!pdfPath) throw new Error('The exported PDF was not available for verification.');
+	const pdfBytes = new Uint8Array(await readFile(pdfPath));
+	expect(new TextDecoder().decode(pdfBytes.slice(0, 5))).toBe('%PDF-');
+	const extracted = await extractTextItems(pdfBytes);
+	expect(extracted.totalPages).toBeGreaterThanOrEqual(1);
+	const firstPageItems = extracted.items[0];
+	const firstPageText = firstPageItems.map((item) => item.str).join(' ');
+	expect(firstPageText.replaceAll(' ', '')).toContain('CHAPTER1');
+	expect(firstPageText).toContain('The Lantern Room');
+	expect(firstPageText).toContain('A short chapter for export.');
+	expect(firstPageText).toContain('Page 1');
+	const titleItem = firstPageItems.find((item) => item.str.includes('The Lantern Room'));
+	const bodyItem = firstPageItems.find((item) => item.str.includes('A short chapter for export.'));
+	if (!titleItem || !bodyItem)
+		throw new Error('The PDF title or body text could not be positioned.');
+	expect(titleItem.fontSize).toBeGreaterThan(bodyItem.fontSize);
+	expect(titleItem.y).toBeGreaterThan(bodyItem.y);
+	expect(Math.abs(titleItem.x + titleItem.width / 2 - 216)).toBeLessThan(6);
 
 	await page.getByText('Export', { exact: true }).click();
 	const epubDownload = page.waitForEvent('download');
@@ -290,8 +343,20 @@ test('configures book pages, raster and SVG covers, and positioned resizable art
 	const resizeHandle = page.locator('[data-resize-handle="bottom-right"]');
 	const handleBox = await resizeHandle.boundingBox();
 	if (!originalSize || !handleBox) throw new Error('The image resize controls are not visible.');
-	await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+	const handleCenter = {
+		x: handleBox.x + handleBox.width / 2,
+		y: handleBox.y + handleBox.height / 2
+	};
+	const hitResizeHandle = await page.evaluate(({ x, y }) => {
+		const hit = document.elementFromPoint(x, y);
+		return hit instanceof HTMLElement
+			? hit.closest<HTMLElement>('[data-resize-handle]')?.dataset.resizeHandle
+			: undefined;
+	}, handleCenter);
+	expect(hitResizeHandle).toBe('bottom-right');
+	await page.mouse.move(handleCenter.x, handleCenter.y);
 	await page.mouse.down();
+	await expect(imageContainer).toHaveAttribute('data-resize-state', 'true');
 	await page.mouse.move(handleBox.x + 80, handleBox.y + 45, { steps: 5 });
 	await page.mouse.up();
 	await expect

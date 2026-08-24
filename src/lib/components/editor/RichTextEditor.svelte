@@ -28,12 +28,18 @@
 	import type { RichTextNode, TrimSize, TypographyPreset } from '$lib/domain/types';
 	import { editorExtensions } from '$lib/editor/extensions';
 	import { calculateEditorPageLayout } from '$lib/editor/page-layout';
+	import {
+		BOOK_LAYOUT,
+		bookTypographyStyle,
+		type TypesetDocumentHeading
+	} from '$lib/typesetting/book-style';
 
 	type Props = {
 		body: RichTextNode;
 		assetUrls: ReadonlyMap<string, string>;
 		typography: TypographyPreset;
 		trimSize: TrimSize;
+		typesetHeading?: TypesetDocumentHeading;
 		placeholder?: string;
 		onChange: (body: RichTextNode) => void;
 		onAddMedia: (file: File) => Promise<MediaInsertion>;
@@ -45,6 +51,7 @@
 		assetUrls,
 		typography,
 		trimSize,
+		typesetHeading,
 		placeholder = 'Begin writing…',
 		onChange,
 		onAddMedia,
@@ -56,17 +63,33 @@
 	let pageCount = $state(1);
 	let pageHeight = $state(1_104);
 	let pageGap = $state(32);
+	let pageMarginInline = $state(88);
 	let pageMarginBlock = $state(88);
+	let documentHeadingHeight = $state(0);
 	let mediaInput = $state<HTMLInputElement>();
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
 	const pageNumbers = $derived(Array.from({ length: pageCount }, (_, index) => index + 1));
 	const canvasHeight = $derived(pageCount * pageHeight + (pageCount - 1) * pageGap);
+	const typographyStyle = $derived(bookTypographyStyle(typography));
+	const documentHeadingTop = $derived(pageHeight * BOOK_LAYOUT.documentHeadingTopRatio);
+	const documentHeadingGap = $derived(
+		typographyStyle.editorBodyFontSizeRem * 16 * BOOK_LAYOUT.documentHeadingGapEm
+	);
+	const documentHeadingSpace = $derived(
+		typesetHeading
+			? Math.max(
+					0,
+					documentHeadingTop + documentHeadingHeight + documentHeadingGap - pageMarginBlock
+				)
+			: 0
+	);
 
 	function updatePaperLayout(element: HTMLElement): void {
 		if (element.clientWidth <= 0) return;
 		const layout = calculateEditorPageLayout(trimSize, element.clientWidth);
 		pageHeight = layout.pageHeight;
 		pageGap = layout.pageGap;
+		pageMarginInline = layout.pageMarginInline;
 		pageMarginBlock = layout.pageMarginBlock;
 	}
 
@@ -84,6 +107,19 @@
 		mediaInput = element;
 		return () => {
 			mediaInput = undefined;
+		};
+	};
+
+	const observeDocumentHeading: Attachment<HTMLElement> = (element) => {
+		const updateHeight = () => {
+			documentHeadingHeight = element.getBoundingClientRect().height;
+		};
+		updateHeight();
+		const resizeObserver = new ResizeObserver(updateHeight);
+		resizeObserver.observe(element);
+
+		return () => {
+			resizeObserver.disconnect();
 		};
 	};
 
@@ -193,12 +229,7 @@
 	}
 </script>
 
-<div
-	class="editor-shell"
-	class:literary={typography === 'literary'}
-	class:classic={typography === 'classic'}
-	class:modern={typography === 'modern'}
->
+<div class="editor-shell">
 	<div class="toolbar" aria-label="Text formatting">
 		<select
 			class="block-select"
@@ -318,14 +349,49 @@
 		{@attach observePaper}
 		style:--page-height={`${pageHeight}px`}
 		style:--page-gap={`${pageGap}px`}
+		style:--page-margin-inline={`${pageMarginInline}px`}
 		style:--page-margin-block={`${pageMarginBlock}px`}
 		style:--canvas-height={`${canvasHeight}px`}
+		style:--body-font-family={typographyStyle.editorFontFamily}
+		style:--body-font-size={`${typographyStyle.editorBodyFontSizeRem}rem`}
+		style:--body-line-height={String(typographyStyle.lineHeight)}
+		style:--document-heading-top={`${documentHeadingTop}px`}
+		style:--document-heading-space={`${documentHeadingSpace}px`}
+		style:--document-title-scale={String(typographyStyle.documentTitleScale)}
+		style:--document-label-scale={String(typographyStyle.documentLabelScale)}
+		style:--document-title-letter-spacing={`${BOOK_LAYOUT.documentTitleLetterSpacingEm}em`}
+		style:--document-label-letter-spacing={`${BOOK_LAYOUT.documentLabelLetterSpacingEm}em`}
+		style:--document-label-gap={`${BOOK_LAYOUT.documentLabelGapEm}em`}
+		style:--heading-one-scale={String(typographyStyle.headingOneScale)}
+		style:--heading-two-scale={String(typographyStyle.headingTwoScale)}
+		style:--heading-three-scale={String(typographyStyle.headingThreeScale)}
+		style:--heading-line-height={String(BOOK_LAYOUT.headingLineHeight)}
+		style:--paragraph-gap={`${BOOK_LAYOUT.paragraphGapEm}em`}
+		style:--paragraph-indent={`${BOOK_LAYOUT.paragraphIndentEm}em`}
+		style:--heading-margin-top={`${BOOK_LAYOUT.headingMarginTopEm}em`}
+		style:--heading-margin-bottom={`${BOOK_LAYOUT.headingMarginBottomEm}em`}
+		style:--blockquote-margin-block={`${BOOK_LAYOUT.blockquoteMarginBlockEm}em`}
+		style:--blockquote-margin-inline={`${BOOK_LAYOUT.blockquoteMarginInlineEm}em`}
+		style:--media-margin-block={`${BOOK_LAYOUT.mediaMarginBlockEm}em`}
 	>
 		<div class="page-stack" aria-hidden="true">
 			{#each pageNumbers as pageNumber (pageNumber)}
 				<div class="page-sheet"><span>Page {pageNumber}</span></div>
 			{/each}
 		</div>
+		{#if typesetHeading}
+			<div
+				class="typeset-document-heading"
+				class:chapter-heading={typesetHeading.kind === 'chapter'}
+				aria-label="Typeset page heading"
+				{@attach observeDocumentHeading}
+			>
+				{#if typesetHeading.label}
+					<p>{typesetHeading.label}</p>
+				{/if}
+				<h1>{typesetHeading.title}</h1>
+			</div>
+		{/if}
 		<div class="editor-mount" {@attach mountEditor}></div>
 	</div>
 </div>
@@ -456,12 +522,42 @@
 
 	.page-sheet span {
 		position: absolute;
-		right: clamp(1.4rem, 12%, 5.5rem);
+		right: var(--page-margin-inline);
 		bottom: 1.35rem;
 		color: #96958f;
 		font-family: 'Manrope Variable', sans-serif;
 		font-size: 0.65rem;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.typeset-document-heading {
+		position: absolute;
+		z-index: 2;
+		top: var(--document-heading-top);
+		right: var(--page-margin-inline);
+		left: var(--page-margin-inline);
+		color: #171a18;
+		font-family: var(--body-font-family);
+		text-align: center;
+		text-wrap: balance;
+		pointer-events: none;
+	}
+
+	.typeset-document-heading p {
+		margin: 0 0 var(--document-label-gap);
+		font-size: calc(var(--body-font-size) * var(--document-label-scale));
+		font-weight: 650;
+		letter-spacing: var(--document-label-letter-spacing);
+		line-height: var(--heading-line-height);
+		text-transform: uppercase;
+	}
+
+	.typeset-document-heading h1 {
+		margin: 0;
+		font-size: calc(var(--body-font-size) * var(--document-title-scale));
+		font-weight: 400;
+		letter-spacing: var(--document-title-letter-spacing);
+		line-height: var(--heading-line-height);
 	}
 
 	.editor-mount {
@@ -475,31 +571,19 @@
 		width: 100%;
 		min-width: 0;
 		min-height: var(--canvas-height);
-		padding: var(--page-margin-block) clamp(1.4rem, 12%, 5.5rem);
+		padding-block-start: calc(var(--page-margin-block) + var(--document-heading-space));
+		padding-block-end: var(--page-margin-block);
+		padding-inline: var(--page-margin-inline);
 		color: #171a18;
 		background: transparent;
-		font-size: 1rem;
-		line-height: 1.72;
+		font-family: var(--body-font-family);
+		font-size: var(--body-font-size);
+		line-height: var(--body-line-height);
 		hyphens: auto;
 		overflow-wrap: anywhere;
 		word-break: normal;
 		text-wrap: pretty;
 		outline: none;
-	}
-
-	.literary .editor-mount :global(.writing-surface) {
-		font-family: 'Libre Baskerville', Georgia, serif;
-	}
-
-	.classic .editor-mount :global(.writing-surface) {
-		font-family: Georgia, 'Times New Roman', serif;
-		font-size: 1.04rem;
-	}
-
-	.modern .editor-mount :global(.writing-surface) {
-		font-family: 'Manrope Variable', sans-serif;
-		font-size: 0.98rem;
-		line-height: 1.68;
 	}
 
 	.editor-mount :global(.page-break-decoration) {
@@ -516,36 +600,36 @@
 	}
 
 	.editor-mount :global(.writing-surface p) {
-		margin: 0 0 0.2rem;
+		margin: 0 0 var(--paragraph-gap);
 	}
 
 	.editor-mount :global(.writing-surface p + p) {
-		text-indent: 1.5em;
+		text-indent: var(--paragraph-indent);
 	}
 
 	.editor-mount :global(.writing-surface h1),
 	.editor-mount :global(.writing-surface h2),
 	.editor-mount :global(.writing-surface h3) {
-		margin: 2.2em 0 0.8em;
-		line-height: 1.25;
+		margin: var(--heading-margin-top) 0 var(--heading-margin-bottom);
+		line-height: var(--heading-line-height);
 		text-wrap: balance;
 	}
 
 	.editor-mount :global(.writing-surface h1) {
-		font-size: 1.75rem;
+		font-size: calc(var(--body-font-size) * var(--heading-one-scale));
 		text-align: center;
 	}
 
 	.editor-mount :global(.writing-surface h2) {
-		font-size: 1.35rem;
+		font-size: calc(var(--body-font-size) * var(--heading-two-scale));
 	}
 
 	.editor-mount :global(.writing-surface h3) {
-		font-size: 1.08rem;
+		font-size: calc(var(--body-font-size) * var(--heading-three-scale));
 	}
 
 	.editor-mount :global(.writing-surface blockquote) {
-		margin: 1.5rem 2rem;
+		margin: var(--blockquote-margin-block) var(--blockquote-margin-inline);
 		color: #48524d;
 		font-style: italic;
 	}
@@ -562,7 +646,7 @@
 	.editor-mount :global([data-resize-container]) {
 		max-width: 100%;
 		justify-content: center;
-		margin: 1.5rem 0;
+		margin: var(--media-margin-block) 0;
 	}
 
 	.editor-mount :global([data-resize-container]:has(img[data-alignment='left'])) {
@@ -629,10 +713,6 @@
 
 		.page-sheet {
 			box-shadow: none;
-		}
-
-		.editor-mount :global(.writing-surface) {
-			padding-inline: 1.4rem;
 		}
 	}
 </style>

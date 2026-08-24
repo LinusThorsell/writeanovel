@@ -5,8 +5,13 @@
 	import type { SyncStatus } from '$lib/domain/types';
 	import { richTextToPlainText } from '$lib/export/rich-text-html';
 	import RichTextEditor from '$lib/components/editor/RichTextEditor.svelte';
+	import { typesetDocumentHeading, type TypesetDocumentHeading } from '$lib/typesetting/book-style';
 
 	let { model }: { model: WriteANovelState } = $props();
+	const typesetHeading: TypesetDocumentHeading | undefined = $derived.by(() => {
+		if (!model.workspace || !model.activeDocument) return undefined;
+		return typesetDocumentHeading(model.workspace.documents, model.activeDocument);
+	});
 
 	function commitTitle(event: FocusEvent): void {
 		model.updateActiveTitle((event.currentTarget as HTMLInputElement).value);
@@ -120,6 +125,7 @@
 						assetUrls={model.assetUrls}
 						typography={model.workspace?.project.typography ?? 'literary'}
 						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
+						{typesetHeading}
 						placeholder={model.activeDocument.kind === 'chapter'
 							? 'Begin this chapter…'
 							: 'Write this page…'}

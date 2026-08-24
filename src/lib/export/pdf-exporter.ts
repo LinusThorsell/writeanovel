@@ -4,6 +4,7 @@ import type {
 	Alignment,
 	Content,
 	ContentImage,
+	ContentStack,
 	ContentSvg,
 	ContentText,
 	TDocumentDefinitions
@@ -19,11 +20,17 @@ import type {
 	MediaAsset,
 	RichTextMark,
 	RichTextNode,
-	TrimSize,
-	TypographyPreset,
 	WorkspaceSnapshot
 } from '$lib/domain/types';
 import { blobToDataUrl } from '$lib/application/media-service';
+import {
+	BOOK_LAYOUT,
+	BOOK_PAGE_METRICS,
+	bookTypographyStyle,
+	editorContentWidthPx,
+	typesetDocumentHeading,
+	type BookTypographyStyle
+} from '$lib/typesetting/book-style';
 import { safeFileName } from './download';
 
 type PreparedPdfAsset = { kind: 'image'; source: string } | { kind: 'svg'; source: string };
@@ -31,18 +38,9 @@ type PreparedPdfAsset = { kind: 'image'; source: string } | { kind: 'svg'; sourc
 type PdfContext = {
 	assets: ReadonlyMap<string, PreparedPdfAsset>;
 	contentWidth: number;
-};
-
-const pageSizes: Record<TrimSize, { width: number; height: number }> = {
-	'trade-6x9': { width: 432, height: 648 },
-	a5: { width: 419.53, height: 595.28 },
-	letter: { width: 612, height: 792 }
-};
-
-const fontNames: Record<TypographyPreset, string> = {
-	literary: 'Literary',
-	classic: 'Literary',
-	modern: 'Manrope'
+	editorContentWidth: number;
+	typography: BookTypographyStyle;
+	previousBlock: 'paragraph' | 'other' | undefined;
 };
 
 let fontsReady: Promise<void> | undefined;
@@ -106,57 +104,94 @@ function imageContent(node: RichTextNode, context: PdfContext): Content | undefi
 	const requestedWidth = numberAttribute(node.attrs?.width);
 	const width = Math.min(
 		context.contentWidth,
-		requestedWidth ? requestedWidth * 0.75 : context.contentWidth
+		requestedWidth
+			? Math.max(1, (requestedWidth / context.editorContentWidth) * context.contentWidth)
+			: context.contentWidth
 	);
 	const alignment = alignmentAttribute(node.attrs?.alignment) ?? 'center';
+	const mediaMargin = context.typography.bodyFontSizePt * BOOK_LAYOUT.mediaMarginBlockEm;
 
 	if (asset.kind === 'svg') {
-		const content: ContentSvg = { svg: asset.source, width, alignment, margin: [0, 12, 0, 12] };
+		const content: ContentSvg = {
+			svg: asset.source,
+			width,
+			alignment,
+			margin: [0, mediaMargin, 0, mediaMargin]
+		};
 		return content;
 	}
 	const content: ContentImage = {
 		image: asset.source,
 		width,
 		alignment,
-		margin: [0, 12, 0, 12]
+		margin: [0, mediaMargin, 0, mediaMargin]
 	};
 	return content;
 }
 
 function listItemContent(node: RichTextNode, context: PdfContext): Content {
-	const converted = blockContent(node, context);
+	const converted = blockContent(node, { ...context, previousBlock: undefined });
 	return converted.length === 1 ? converted[0] : { stack: converted };
 }
 
 function blockContent(node: RichTextNode, context: PdfContext): Content[] {
 	const alignment = alignmentAttribute(node.attrs?.textAlign);
+	const bodySize = context.typography.bodyFontSizePt;
 
 	switch (node.type) {
 		case 'doc':
 			return (node.content ?? []).flatMap((child) => blockContent(child, context));
-		case 'paragraph':
-			return [{ text: inlineContent(node), alignment, margin: [0, 0, 0, 7] }];
+		case 'paragraph': {
+			const leadingIndent =
+				context.previousBlock === 'paragraph'
+					? bodySize * BOOK_LAYOUT.paragraphIndentEm
+					: undefined;
+			context.previousBlock = 'paragraph';
+			return [
+				{
+					text: inlineContent(node),
+					alignment,
+					leadingIndent,
+					margin: [0, 0, 0, bodySize * BOOK_LAYOUT.paragraphGapEm]
+				}
+			];
+		}
 		case 'heading': {
 			const level = numberAttribute(node.attrs?.level) ?? 2;
+			context.previousBlock = 'other';
 			return [
 				{
 					text: inlineContent(node),
 					style: level === 1 ? 'headingOne' : level === 2 ? 'headingTwo' : 'headingThree',
 					alignment,
-					margin: [0, 12, 0, 8]
+					margin: [
+						0,
+						bodySize * BOOK_LAYOUT.headingMarginTopEm,
+						0,
+						bodySize * BOOK_LAYOUT.headingMarginBottomEm
+					]
 				}
 			];
 		}
-		case 'blockquote':
+		case 'blockquote': {
+			context.previousBlock = 'other';
+			const nestedContext: PdfContext = { ...context, previousBlock: undefined };
 			return [
 				{
-					stack: (node.content ?? []).flatMap((child) => blockContent(child, context)),
+					stack: (node.content ?? []).flatMap((child) => blockContent(child, nestedContext)),
 					italics: true,
-					margin: [20, 10, 20, 10],
+					margin: [
+						bodySize * BOOK_LAYOUT.blockquoteMarginInlineEm,
+						bodySize * BOOK_LAYOUT.blockquoteMarginBlockEm,
+						bodySize * BOOK_LAYOUT.blockquoteMarginInlineEm,
+						bodySize * BOOK_LAYOUT.blockquoteMarginBlockEm
+					],
 					color: '#3f4843'
 				}
 			];
+		}
 		case 'bulletList':
+			context.previousBlock = 'other';
 			return [
 				{
 					ul: (node.content ?? []).map((child) => listItemContent(child, context)),
@@ -164,6 +199,7 @@ function blockContent(node: RichTextNode, context: PdfContext): Content[] {
 				}
 			];
 		case 'orderedList':
+			context.previousBlock = 'other';
 			return [
 				{
 					ol: (node.content ?? []).map((child) => listItemContent(child, context)),
@@ -173,8 +209,10 @@ function blockContent(node: RichTextNode, context: PdfContext): Content[] {
 		case 'listItem':
 			return (node.content ?? []).flatMap((child) => blockContent(child, context));
 		case 'horizontalRule':
+			context.previousBlock = 'other';
 			return [{ text: '•  •  •', alignment: 'center', margin: [0, 12, 0, 12] }];
 		case 'image': {
+			context.previousBlock = 'other';
 			const image = imageContent(node, context);
 			return image ? [image] : [];
 		}
@@ -258,32 +296,66 @@ async function prepareFonts(): Promise<void> {
 
 function coverContent(
 	asset: PreparedPdfAsset,
-	pageWidth: number,
-	pageHeight: number
+	contentWidth: number,
+	contentHeight: number
 ): ContentImage | ContentSvg {
-	const fit: [number, number] = [pageWidth - 36, pageHeight - 36];
+	const fit: [number, number] = [contentWidth, contentHeight];
 	return asset.kind === 'svg'
 		? { svg: asset.source, fit, alignment: 'center', margin: [0, 0, 0, 0] }
 		: { image: asset.source, fit, alignment: 'center', margin: [0, 0, 0, 0] };
 }
 
+function manuscriptHeadingContent(
+	workspace: WorkspaceSnapshot,
+	document: WorkspaceSnapshot['documents'][number],
+	typography: BookTypographyStyle,
+	pageBreak: 'before' | undefined
+): ContentStack {
+	const heading = typesetDocumentHeading(workspace.documents, document);
+	const page = BOOK_PAGE_METRICS[workspace.project.trimSize];
+	const stack: Content[] = [];
+	if (heading.label) {
+		stack.push({
+			text: heading.label.toLocaleUpperCase(),
+			style: 'documentLabel',
+			alignment: 'center'
+		});
+	}
+	stack.push({
+		text: heading.title,
+		style: 'documentTitle',
+		alignment: 'center',
+		outline: true,
+		outlineText: heading.title
+	});
+
+	return {
+		stack,
+		pageBreak,
+		unbreakable: true,
+		margin: [
+			0,
+			Math.max(0, page.height * BOOK_LAYOUT.documentHeadingTopRatio - page.marginBlock),
+			0,
+			typography.bodyFontSizePt * BOOK_LAYOUT.documentHeadingGapEm
+		]
+	};
+}
+
 export async function buildPdfDefinition(
 	workspace: WorkspaceSnapshot
 ): Promise<TDocumentDefinitions> {
-	const pageSize = pageSizes[workspace.project.trimSize];
-	const pageMargin = workspace.project.trimSize === 'letter' ? 72 : 50;
+	const page = BOOK_PAGE_METRICS[workspace.project.trimSize];
+	const typography = bookTypographyStyle(workspace.project.typography);
+	const pageSize = { width: page.width, height: page.height };
 	const preparedAssets = await prepareAssets(workspace.assets);
-	const context: PdfContext = {
-		assets: preparedAssets,
-		contentWidth: pageSize.width - pageMargin * 2
-	};
+	const contentWidth = page.width - page.marginInline * 2;
+	const contentHeight = page.height - page.marginBlock * 2;
 	const content: Content[] = [];
 	const frontCoverId = workspace.project.frontCoverAssetId;
 	const frontCover = frontCoverId ? preparedAssets.get(frontCoverId) : undefined;
 	if (frontCover) {
-		const cover = coverContent(frontCover, pageSize.width, pageSize.height);
-		cover.pageBreak = 'after';
-		content.push(cover);
+		content.push(coverContent(frontCover, contentWidth, contentHeight));
 	}
 
 	const documents = [
@@ -293,22 +365,29 @@ export async function buildPdfDefinition(
 	];
 
 	for (const manuscriptDocument of documents) {
-		content.push({
-			text: manuscriptDocument.title,
-			style: 'chapterTitle',
-			alignment: 'center',
-			pageBreak: content.length > 0 ? 'before' : undefined,
-			outline: true,
-			outlineText: manuscriptDocument.title,
-			margin: [0, 110, 0, 32]
-		});
-		content.push(...blockContent(manuscriptDocument.body, context));
+		content.push(
+			manuscriptHeadingContent(
+				workspace,
+				manuscriptDocument,
+				typography,
+				content.length > 0 ? 'before' : undefined
+			)
+		);
+		content.push(
+			...blockContent(manuscriptDocument.body, {
+				assets: preparedAssets,
+				contentWidth,
+				editorContentWidth: editorContentWidthPx(workspace.project.trimSize),
+				typography,
+				previousBlock: undefined
+			})
+		);
 	}
 
 	const backCoverId = workspace.project.backCoverAssetId;
 	const backCover = backCoverId ? preparedAssets.get(backCoverId) : undefined;
 	if (backCover) {
-		const cover = coverContent(backCover, pageSize.width, pageSize.height);
+		const cover = coverContent(backCover, contentWidth, contentHeight);
 		cover.pageBreak = 'before';
 		content.push(cover);
 	}
@@ -316,26 +395,54 @@ export async function buildPdfDefinition(
 	return {
 		content,
 		pageSize,
-		pageMargins: [pageMargin, pageMargin, pageMargin, pageMargin],
+		pageMargins: [page.marginInline, page.marginBlock, page.marginInline, page.marginBlock],
 		defaultStyle: {
-			font: fontNames[workspace.project.typography],
-			fontSize: workspace.project.typography === 'modern' ? 10.5 : 10,
-			lineHeight: workspace.project.typography === 'modern' ? 1.42 : 1.5,
-			alignment: 'justify',
+			font: typography.pdfFont,
+			fontSize: typography.bodyFontSizePt,
+			lineHeight: typography.lineHeight,
+			alignment: 'left',
 			color: '#171a18'
 		},
 		styles: {
-			chapterTitle: { fontSize: 18, bold: false, characterSpacing: 0.7 },
-			headingOne: { fontSize: 17, bold: true },
-			headingTwo: { fontSize: 14, bold: true },
-			headingThree: { fontSize: 11, bold: true, characterSpacing: 0.4 }
+			documentLabel: {
+				fontSize: typography.bodyFontSizePt * typography.documentLabelScale,
+				bold: true,
+				characterSpacing: typography.bodyFontSizePt * BOOK_LAYOUT.documentLabelLetterSpacingEm,
+				lineHeight: BOOK_LAYOUT.headingLineHeight,
+				margin: [0, 0, 0, typography.bodyFontSizePt * BOOK_LAYOUT.documentLabelGapEm]
+			},
+			documentTitle: {
+				fontSize: typography.bodyFontSizePt * typography.documentTitleScale,
+				bold: false,
+				characterSpacing: typography.bodyFontSizePt * BOOK_LAYOUT.documentTitleLetterSpacingEm,
+				lineHeight: BOOK_LAYOUT.headingLineHeight
+			},
+			headingOne: {
+				fontSize: typography.bodyFontSizePt * typography.headingOneScale,
+				bold: true,
+				lineHeight: BOOK_LAYOUT.headingLineHeight
+			},
+			headingTwo: {
+				fontSize: typography.bodyFontSizePt * typography.headingTwoScale,
+				bold: true,
+				lineHeight: BOOK_LAYOUT.headingLineHeight
+			},
+			headingThree: {
+				fontSize: typography.bodyFontSizePt * typography.headingThreeScale,
+				bold: true,
+				lineHeight: BOOK_LAYOUT.headingLineHeight
+			}
 		},
 		footer: (currentPage, pageCount) => ({
-			text: `${currentPage}  /  ${pageCount}`,
-			alignment: 'center',
-			fontSize: 8,
+			text:
+				(frontCover && currentPage === 1) || (backCover && currentPage === pageCount)
+					? ''
+					: `Page ${currentPage}`,
+			alignment: 'right',
+			font: 'Manrope',
+			fontSize: 7,
 			color: '#777d79',
-			margin: [0, 12, 0, 0]
+			margin: [page.marginInline, 12, page.marginInline, 0]
 		}),
 		info: {
 			title: workspace.project.title,
