@@ -31,7 +31,7 @@ test('installed app reloads and keeps writing with the network disabled', async 
 	await context.setOffline(true);
 	await page.reload();
 	await expect(page.getByText('Offline Mountain')).toBeVisible();
-	await page.getByRole('button', { name: /Offline Mountain/ }).click();
+	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 1');
 	await expect(page.locator('.writing-surface')).toContainText('connection disappeared');
 	await page.locator('.writing-surface').fill('Written completely offline.');
 	await page.waitForTimeout(700);

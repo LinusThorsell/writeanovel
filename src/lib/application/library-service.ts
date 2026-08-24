@@ -1,6 +1,7 @@
 import type { LocalLibraryPort } from './ports';
 import { SyncService, pendingChangeFor } from './sync-service';
 import type {
+	AppPreferences,
 	AuthenticatedUser,
 	LibraryEntityType,
 	ManuscriptDocument,
@@ -38,6 +39,14 @@ export class LibraryService {
 
 	async getWorkspace(projectId: string): Promise<WorkspaceSnapshot | undefined> {
 		return this.local.getWorkspace(projectId);
+	}
+
+	async getPreferences(): Promise<AppPreferences> {
+		return this.local.getPreferences();
+	}
+
+	async savePreferences(preferences: AppPreferences): Promise<void> {
+		await this.local.savePreferences(preferences);
 	}
 
 	async createProject(project: NovelProject, firstDocument: ManuscriptDocument): Promise<void> {

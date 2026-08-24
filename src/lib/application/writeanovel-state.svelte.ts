@@ -86,6 +86,15 @@ export class WriteANovelState {
 		}
 
 		this.projects = await this.library.listProjects();
+		const preferences = await this.library.getPreferences();
+		if (
+			preferences.activeProjectId &&
+			this.projects.some((project) => project.id === preferences.activeProjectId)
+		) {
+			await this.openProject(preferences.activeProjectId, preferences.activeItemId);
+		} else if (preferences.activeProjectId) {
+			await this.library.savePreferences({ id: 'current' });
+		}
 		this.loading = false;
 	}
 
@@ -103,15 +112,15 @@ export class WriteANovelState {
 		this.showNotice('Your new novel is ready.');
 	}
 
-	async openProject(projectId: string): Promise<void> {
+	async openProject(projectId: string, preferredItemId?: string): Promise<void> {
 		const workspace = await this.library.getWorkspace(projectId);
 		if (!workspace) return;
 		this.replaceAssetUrls(workspace.assets);
 		this.workspace = workspace;
-		this.activeItemId =
-			documentsOfKind(workspace.documents, 'chapter')[0]?.id ??
-			workspace.documents[0]?.id ??
-			workspace.notes[0]?.id;
+		this.activeItemId = this.workspaceItemExists(workspace, preferredItemId)
+			? preferredItemId
+			: this.firstWorkspaceItemId(workspace);
+		this.rememberWorkspace();
 	}
 
 	closeProject(): void {
@@ -119,10 +128,12 @@ export class WriteANovelState {
 		this.assetUrls = new Map();
 		this.workspace = undefined;
 		this.activeItemId = undefined;
+		this.rememberWorkspace();
 	}
 
 	selectItem(itemId: string): void {
 		this.activeItemId = itemId;
+		this.rememberWorkspace();
 	}
 
 	async addChapter(afterId?: string): Promise<void> {
@@ -140,6 +151,7 @@ export class WriteANovelState {
 			documents: [...this.workspace.documents, document]
 		};
 		this.activeItemId = document.id;
+		this.rememberWorkspace();
 	}
 
 	async addMatter(kind: Exclude<DocumentKind, 'chapter'>, matterType: MatterType): Promise<void> {
@@ -167,6 +179,7 @@ export class WriteANovelState {
 			documents: [...this.workspace.documents, document]
 		};
 		this.activeItemId = document.id;
+		this.rememberWorkspace();
 	}
 
 	async moveActiveDocument(direction: -1 | 1): Promise<void> {
@@ -272,6 +285,7 @@ export class WriteANovelState {
 		await this.library.saveNote(note);
 		this.workspace = { ...this.workspace, notes: [...this.workspace.notes, note] };
 		this.activeItemId = note.id;
+		this.rememberWorkspace();
 	}
 
 	async addMedia(file: File): Promise<MediaInsertion> {
@@ -441,6 +455,7 @@ export class WriteANovelState {
 			documentsOfKind(this.workspace.documents, 'chapter')[0]?.id ??
 			this.workspace.documents[0]?.id ??
 			this.workspace.notes[0]?.id;
+		this.rememberWorkspace();
 	}
 
 	private replaceAssetUrls(assets: MediaAsset[]): void {
@@ -450,7 +465,36 @@ export class WriteANovelState {
 
 	private async reloadAfterCloudChange(): Promise<void> {
 		this.projects = await this.library.listProjects();
-		if (this.workspace) await this.openProject(this.workspace.project.id);
+		if (this.workspace) await this.openProject(this.workspace.project.id, this.activeItemId);
+	}
+
+	private firstWorkspaceItemId(workspace: WorkspaceSnapshot): string | undefined {
+		return (
+			documentsOfKind(workspace.documents, 'chapter')[0]?.id ??
+			workspace.documents[0]?.id ??
+			workspace.notes[0]?.id
+		);
+	}
+
+	private workspaceItemExists(
+		workspace: WorkspaceSnapshot,
+		itemId: string | undefined
+	): itemId is string {
+		return Boolean(
+			itemId &&
+			(workspace.documents.some((document) => document.id === itemId) ||
+				workspace.notes.some((note) => note.id === itemId))
+		);
+	}
+
+	private rememberWorkspace(): void {
+		this.library
+			.savePreferences({
+				id: 'current',
+				activeProjectId: this.workspace?.project.id,
+				activeItemId: this.activeItemId
+			})
+			.catch(() => undefined);
 	}
 
 	private showNotice(message: string): void {

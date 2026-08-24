@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowDown, ArrowUp, Cloud, CloudOff, HardDrive, Trash2 } from '@lucide/svelte';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
+	import { preserveEditorScrollPosition } from '$lib/application/editor-scroll-position';
 	import type { SyncStatus } from '$lib/domain/types';
 	import { richTextToPlainText } from '$lib/export/rich-text-html';
 	import RichTextEditor from '$lib/components/editor/RichTextEditor.svelte';
@@ -108,7 +109,10 @@
 			</div>
 		{/if}
 
-		<div class="editor-area">
+		<div
+			class="editor-area"
+			{@attach preserveEditorScrollPosition(model.activeDocument?.id ?? model.activeNote?.id)}
+		>
 			{#if model.activeDocument}
 				{#key model.activeDocument.id}
 					<RichTextEditor

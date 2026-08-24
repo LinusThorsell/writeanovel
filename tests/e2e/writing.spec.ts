@@ -48,13 +48,12 @@ test('creates, orders, writes, and persists a multi-file novel locally', async (
 	await page.waitForTimeout(700);
 
 	await page.reload();
-	await page.getByRole('button', { name: /The Glass Harbor/ }).click();
-	await page.getByRole('button', { name: /Mara Venn/ }).click();
+	await expect(page.getByLabel('Page title')).toHaveValue('Mara Venn');
 	await expect(page.locator('.writing-surface')).toContainText('Cartographer');
 	await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 });
 
-test('flows a long chapter across pages without breaking the workspace layout', async ({
+test('flows a long chapter across pages and restores the writing position after reload', async ({
 	page
 }) => {
 	await createNovel(page, 'The Long Road');
@@ -161,13 +160,48 @@ test('flows a long chapter across pages without breaking the workspace layout', 
 		);
 	});
 	expect(mobileLayoutFits).toBe(true);
+	const editorArea = page.locator('.editor-area');
+	await editorArea.hover();
+	await page.mouse.wheel(0, -1_000_000);
+	await expect
+		.poll(async () => editorArea.evaluate((element) => element.scrollTop))
+		.toBeLessThan(2);
+	const maximumScroll = await editorArea.evaluate(
+		(element) => element.scrollHeight - element.clientHeight
+	);
+	await page.mouse.wheel(0, maximumScroll * 0.48);
+	await expect
+		.poll(async () => editorArea.evaluate((element) => element.scrollTop))
+		.toBeGreaterThan(1_000);
+	const scrollPosition = await editorArea.evaluate((element) => {
+		const maximumScroll = element.scrollHeight - element.clientHeight;
+		return {
+			pixels: element.scrollTop,
+			progress: element.scrollTop / maximumScroll
+		};
+	});
+	expect(scrollPosition.pixels).toBeGreaterThan(1_000);
 
-	await page.waitForTimeout(700);
+	await page.waitForTimeout(800);
 	await page.reload();
-	await page.getByRole('button', { name: /The Long Road/ }).click();
+	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 1');
 	await expect(editor).toContainText('Passage 150');
 	await expect(editor).toContainText('added after automatic pagination');
 	await expect.poll(async () => page.locator('.page-break-decoration').count()).toBeGreaterThan(1);
+	await expect
+		.poll(async () =>
+			editorArea.evaluate(
+				(element) => element.scrollTop / (element.scrollHeight - element.clientHeight)
+			)
+		)
+		.toBeGreaterThan(scrollPosition.progress - 0.002);
+	await expect
+		.poll(async () =>
+			editorArea.evaluate(
+				(element) => element.scrollTop / (element.scrollHeight - element.clientHeight)
+			)
+		)
+		.toBeLessThan(scrollPosition.progress + 0.002);
 });
 
 test('anonymous free writing makes no PocketBase requests', async ({ page }) => {
@@ -267,7 +301,7 @@ test('configures book pages, raster and SVG covers, and positioned resizable art
 	await page.waitForTimeout(700);
 
 	await page.reload();
-	await page.getByRole('button', { name: /Illustrated Draft/ }).click();
+	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 1');
 	const restoredArtwork = page.getByRole('img', { name: 'chapter-map.svg' });
 	await expect(restoredArtwork).toBeVisible();
 	await expect
