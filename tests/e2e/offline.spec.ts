@@ -1,5 +1,40 @@
 import { expect, test } from '@playwright/test';
 
+test('fits the mobile viewport and offers application installation', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 700 });
+	await page.goto('/app');
+	await expect(page.locator('.library-page')).toBeVisible();
+
+	await page.evaluate(() => {
+		const installEvent = new Event('beforeinstallprompt') as BeforeInstallPromptEvent;
+		Object.defineProperties(installEvent, {
+			platforms: { value: ['web'] },
+			prompt: { value: async () => undefined },
+			userChoice: {
+				value: Promise.resolve({ outcome: 'accepted', platform: 'web' })
+			}
+		});
+		window.dispatchEvent(installEvent);
+	});
+
+	const installButton = page.getByRole('button', { name: 'Install application' });
+	await expect(installButton).toBeVisible();
+	await installButton.click();
+	await expect(installButton).toBeHidden();
+
+	await page.getByRole('button', { name: 'Create your first novel' }).click();
+	await page.getByLabel('Novel title').fill('Mobile Viewport');
+	await page.getByRole('button', { name: 'Create novel', exact: true }).click();
+
+	const viewportDifference = await page
+		.locator('.workspace-page')
+		.evaluate((element) => Math.abs(element.getBoundingClientRect().height - window.innerHeight));
+	expect(viewportDifference).toBeLessThanOrEqual(1);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+		true
+	);
+});
+
 test('installed app reloads and keeps writing with the network disabled', async ({
 	context,
 	page

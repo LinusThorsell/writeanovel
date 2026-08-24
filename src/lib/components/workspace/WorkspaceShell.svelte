@@ -11,6 +11,7 @@
 		UserRound
 	} from '@lucide/svelte';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
+	import InstallApplicationButton from '$lib/components/application/InstallApplicationButton.svelte';
 	import BookSettingsModal from '$lib/components/settings/BookSettingsModal.svelte';
 	import EditorPane from './EditorPane.svelte';
 	import WorkspaceSidebar from './WorkspaceSidebar.svelte';
@@ -45,6 +46,7 @@
 		</div>
 
 		<div class="topbar-actions">
+			<InstallApplicationButton variant="dark" />
 			<span
 				class="compact-status"
 				class:warning={model.syncStatus === 'error' || model.syncStatus === 'offline'}
@@ -113,20 +115,23 @@
 
 <style>
 	.workspace-page {
+		--topbar-height: calc(3.45rem + env(safe-area-inset-top));
 		min-width: 0;
 		min-height: 0;
 		height: 100vh;
+		height: 100dvh;
 		overflow: hidden;
 		background: #e9e4db;
 	}
 
 	.topbar {
 		display: flex;
-		height: 3.45rem;
+		height: var(--topbar-height);
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
-		padding: 0 0.7rem;
+		padding: env(safe-area-inset-top) max(0.7rem, env(safe-area-inset-right)) 0
+			max(0.7rem, env(safe-area-inset-left));
 		background: var(--forest-deep);
 		box-shadow: 0 1px 0 rgb(255 255 255 / 8%);
 		color: white;
@@ -275,8 +280,10 @@
 		display: grid;
 		min-width: 0;
 		min-height: 0;
-		height: calc(100vh - 3.45rem);
+		height: calc(100vh - var(--topbar-height));
+		height: calc(100dvh - var(--topbar-height));
 		grid-template-columns: 17.5rem minmax(0, 1fr);
+		padding-bottom: env(safe-area-inset-bottom);
 		overflow: hidden;
 	}
 
@@ -313,7 +320,7 @@
 		.sidebar {
 			position: fixed;
 			z-index: 30;
-			inset: 3.45rem 0 0;
+			inset: var(--topbar-height) 0 env(safe-area-inset-bottom);
 			visibility: hidden;
 			background: transparent;
 			opacity: 0;

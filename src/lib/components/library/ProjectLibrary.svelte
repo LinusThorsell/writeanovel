@@ -2,6 +2,7 @@
 	import { BookOpen, Cloud, CloudOff, Feather, HardDrive, Plus, UserRound } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
+	import InstallApplicationButton from '$lib/components/application/InstallApplicationButton.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
 
 	let { model }: { model: WriteANovelState } = $props();
@@ -41,6 +42,7 @@
 			><span><Feather size={21} /></span><strong>WriteANovel</strong></a
 		>
 		<div class="header-actions">
+			<InstallApplicationButton />
 			<span class:offline={!online} class="connection"
 				>{#if online}<Cloud size={15} />Online{:else}<CloudOff size={15} />Offline{/if}</span
 			>
@@ -153,14 +155,17 @@
 <style>
 	.library-page {
 		min-height: 100vh;
+		min-height: 100dvh;
+		padding-bottom: env(safe-area-inset-bottom);
 	}
 
 	.site-header {
 		display: flex;
-		height: 4.5rem;
+		height: calc(4.5rem + env(safe-area-inset-top));
 		align-items: center;
 		justify-content: space-between;
-		padding: 0 4vw;
+		padding: env(safe-area-inset-top) max(4vw, env(safe-area-inset-right)) 0
+			max(4vw, env(safe-area-inset-left));
 		background: rgb(251 248 242 / 78%);
 		border-bottom: 1px solid rgb(216 208 194 / 75%);
 		backdrop-filter: blur(12px);
@@ -467,7 +472,8 @@
 
 	@media (max-width: 620px) {
 		.site-header {
-			padding: 0 0.8rem;
+			padding: env(safe-area-inset-top) max(0.8rem, env(safe-area-inset-right)) 0
+				max(0.8rem, env(safe-area-inset-left));
 		}
 
 		.connection,

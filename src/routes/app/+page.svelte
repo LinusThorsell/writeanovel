@@ -45,9 +45,11 @@
 	.app-loader {
 		display: grid;
 		min-height: 100vh;
+		min-height: 100dvh;
 		place-content: center;
 		justify-items: center;
-		padding: 2rem;
+		padding: max(2rem, env(safe-area-inset-top)) max(2rem, env(safe-area-inset-right))
+			max(2rem, env(safe-area-inset-bottom)) max(2rem, env(safe-area-inset-left));
 		text-align: center;
 	}
 

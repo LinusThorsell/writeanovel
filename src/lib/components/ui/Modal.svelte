@@ -50,8 +50,11 @@
 		z-index: 50;
 		inset: 0;
 		display: grid;
+		height: 100vh;
+		height: 100dvh;
 		place-items: center;
-		padding: 1rem;
+		padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+			max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 		background: rgb(20 30 26 / 58%);
 		backdrop-filter: blur(5px);
 	}
@@ -69,7 +72,7 @@
 	.modal {
 		position: relative;
 		width: min(36rem, 100%);
-		max-height: calc(100vh - 2rem);
+		max-height: 100%;
 		overflow: auto;
 		background: var(--paper);
 		border: 1px solid rgb(255 255 255 / 45%);

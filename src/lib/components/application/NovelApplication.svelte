@@ -44,8 +44,8 @@
 	.toast {
 		position: fixed;
 		z-index: 80;
-		right: 1rem;
-		bottom: 1rem;
+		right: max(1rem, env(safe-area-inset-right));
+		bottom: max(1rem, env(safe-area-inset-bottom));
 		display: grid;
 		max-width: min(28rem, calc(100vw - 2rem));
 		grid-template-columns: auto 1fr auto;
