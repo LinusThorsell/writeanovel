@@ -70,7 +70,7 @@ Password-reset requests need SMTP configured in the PocketBase dashboard before 
 - WYSIWYG rich-text editing with headings, typography, links, lists, quotations, undo, and redo.
 - Raster image and SVG insertion, alignment, and drag-to-resize controls.
 - Trim-size and typography presets; 6 × 9 inches and Libre Baskerville are the defaults.
-- Browser print / Save as PDF and direct EPUB 3 download, including book pages, artwork, and covers.
+- Direct PDF download and EPUB 3 download, including book pages, artwork, and covers.
 - Installable offline PWA behavior.
 - Prerendered public marketing pages with production SEO and social-sharing metadata.
 
@@ -106,7 +106,7 @@ The permanent Playwright scenarios cover:
 
 - server-rendered marketing copy, unique metadata, canonical URLs, structured data, sitemap, robots policy, and private-route `noindex` behavior;
 - local project creation, chapter insertion, notes, reload persistence, and zero anonymous backend requests;
-- browser print / Save as PDF with matching layout, plus direct EPUB downloads;
+- direct PDF and EPUB downloads;
 - front/back pages, PNG/SVG covers, inline SVG alignment and resizing, and resize persistence;
 - service-worker installation and continued writing after the browser is put offline;
 - registration, explicit premium migration, and restoration from PocketBase in a fresh browser profile.
@@ -120,7 +120,7 @@ src/lib/infrastructure/local/   Dexie database and local repository
 src/lib/infrastructure/pocketbase/
                                 account and cloud adapters
 src/lib/editor/                 Tiptap extensions
-src/lib/export/                 Print/PDF, EPUB, HTML, and download helpers
+src/lib/export/                 PDF, EPUB, HTML, and download helpers
 src/lib/components/             small feature-oriented Svelte components
 src/service-worker.ts           application shell and runtime caching
 pocketbase/pb_migrations/       versioned backend schema

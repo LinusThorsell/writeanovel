@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateEditorPageLayout, editorBodyFontSizePx } from '$lib/editor/page-layout';
+import { calculateEditorPageLayout } from '$lib/editor/page-layout';
 import type { ManuscriptDocument, NovelProject } from '$lib/domain/types';
 import { BOOK_PAGE_METRICS, bookTypographyStyle, typesetDocumentHeading } from './book-style';
 
@@ -81,29 +81,22 @@ describe('shared book typesetting', () => {
 		const pdfPage = BOOK_PAGE_METRICS['trade-6x9'];
 		const editorPage = calculateEditorPageLayout('trade-6x9', pageWidth);
 
-		expect(editorPage.pageHeight).toBe(pageWidth * (pdfPage.height / pdfPage.width));
-		expect(editorPage.pageMarginInline).toBe(pageWidth * (pdfPage.marginInline / pdfPage.width));
+		expect(editorPage.pageHeight).toBe(Math.round(pageWidth * (pdfPage.height / pdfPage.width)));
+		expect(editorPage.pageMarginInline).toBe(
+			Math.round(pageWidth * (pdfPage.marginInline / pdfPage.width))
+		);
 		expect(editorPage.pageMarginBlock).toBe(
-			editorPage.pageHeight * (pdfPage.marginBlock / pdfPage.height)
+			Math.round(editorPage.pageHeight * (pdfPage.marginBlock / pdfPage.height))
 		);
 	});
 
-	it('scales every editor typography preset to the same line width used by browser print', () => {
-		const pageWidth = 736;
-		for (const trimSize of ['trade-6x9', 'a5', 'letter'] as const) {
-			const page = BOOK_PAGE_METRICS[trimSize];
-			const editorPage = calculateEditorPageLayout(trimSize, pageWidth);
-			for (const preset of ['literary', 'classic', 'modern'] as const) {
-				const style = bookTypographyStyle(preset);
-				expect(style.editorFontFamily).toBeTruthy();
-				expect(style.bodyFontSizePt).toBeGreaterThan(9);
-				expect(style.lineHeight).toBeGreaterThan(1.5);
-				const editorLineWidth =
-					(pageWidth - editorPage.pageMarginInline * 2) /
-					editorBodyFontSizePx(trimSize, preset, pageWidth);
-				const printLineWidth = (page.width - page.marginInline * 2) / style.bodyFontSizePt;
-				expect(editorLineWidth).toBeCloseTo(printLineWidth, 10);
-			}
+	it('uses an embeddable PDF counterpart for every editor typography preset', () => {
+		for (const preset of ['literary', 'classic', 'modern'] as const) {
+			const style = bookTypographyStyle(preset);
+			expect(style.editorFontFamily).toBeTruthy();
+			expect(style.pdfFont).toMatch(/Literary|Manrope/);
+			expect(style.bodyFontSizePt).toBeGreaterThan(9);
+			expect(style.lineHeight).toBeGreaterThan(1.5);
 		}
 	});
 });

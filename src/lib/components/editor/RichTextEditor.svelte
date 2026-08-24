@@ -27,7 +27,7 @@
 	} from '$lib/application/media-service';
 	import type { RichTextNode, TrimSize, TypographyPreset } from '$lib/domain/types';
 	import { editorExtensions } from '$lib/editor/extensions';
-	import { calculateEditorPageLayout, editorBodyFontSizePx } from '$lib/editor/page-layout';
+	import { calculateEditorPageLayout } from '$lib/editor/page-layout';
 	import {
 		BOOK_LAYOUT,
 		bookTypographyStyle,
@@ -42,7 +42,6 @@
 		typesetHeading?: TypesetDocumentHeading;
 		placeholder?: string;
 		onChange: (body: RichTextNode) => void;
-		onSave: (body: RichTextNode) => void;
 		onAddMedia: (file: File) => Promise<MediaInsertion>;
 		onError: (message: string) => void;
 	};
@@ -55,7 +54,6 @@
 		typesetHeading,
 		placeholder = 'Begin writing…',
 		onChange,
-		onSave,
 		onAddMedia,
 		onError
 	}: Props = $props();
@@ -63,7 +61,6 @@
 	let editor = $state.raw<Editor>();
 	let revision = $state(0);
 	let pageCount = $state(1);
-	let pageWidth = $state(736);
 	let pageHeight = $state(1_104);
 	let pageGap = $state(32);
 	let pageMarginInline = $state(88);
@@ -71,13 +68,13 @@
 	let documentHeadingHeight = $state(0);
 	let mediaInput = $state<HTMLInputElement>();
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
-	let latestBody: RichTextNode | undefined;
 	const pageNumbers = $derived(Array.from({ length: pageCount }, (_, index) => index + 1));
 	const canvasHeight = $derived(pageCount * pageHeight + (pageCount - 1) * pageGap);
 	const typographyStyle = $derived(bookTypographyStyle(typography));
-	const bodyFontSize = $derived(editorBodyFontSizePx(trimSize, typography, pageWidth));
 	const documentHeadingTop = $derived(pageHeight * BOOK_LAYOUT.documentHeadingTopRatio);
-	const documentHeadingGap = $derived(bodyFontSize * BOOK_LAYOUT.documentHeadingGapEm);
+	const documentHeadingGap = $derived(
+		typographyStyle.editorBodyFontSizeRem * 16 * BOOK_LAYOUT.documentHeadingGapEm
+	);
 	const documentHeadingSpace = $derived(
 		typesetHeading?.label || typesetHeading?.title
 			? Math.max(
@@ -89,7 +86,6 @@
 
 	function updatePaperLayout(element: HTMLElement): void {
 		if (element.clientWidth <= 0) return;
-		pageWidth = element.clientWidth;
 		const layout = calculateEditorPageLayout(trimSize, element.clientWidth);
 		pageHeight = layout.pageHeight;
 		pageGap = layout.pageGap;
@@ -148,22 +144,16 @@
 				revision += 1;
 			},
 			onUpdate: ({ editor: updatedEditor }) => {
-				latestBody = removeTransientAssetSources(updatedEditor.getJSON());
-				onChange(latestBody);
 				if (saveTimer) clearTimeout(saveTimer);
 				saveTimer = setTimeout(() => {
-					if (latestBody) onSave(latestBody);
-					saveTimer = undefined;
+					onChange(removeTransientAssetSources(updatedEditor.getJSON()));
 				}, 350);
 			}
 		});
 		editor = instance;
 
 		return () => {
-			if (saveTimer) {
-				clearTimeout(saveTimer);
-				if (latestBody) onSave(latestBody);
-			}
+			if (saveTimer) clearTimeout(saveTimer);
 			instance.destroy();
 			editor = undefined;
 		};
@@ -363,7 +353,7 @@
 		style:--page-margin-block={`${pageMarginBlock}px`}
 		style:--canvas-height={`${canvasHeight}px`}
 		style:--body-font-family={typographyStyle.editorFontFamily}
-		style:--body-font-size={`${bodyFontSize}px`}
+		style:--body-font-size={`${typographyStyle.editorBodyFontSizeRem}rem`}
 		style:--body-line-height={String(typographyStyle.lineHeight)}
 		style:--document-heading-top={`${documentHeadingTop}px`}
 		style:--document-heading-space={`${documentHeadingSpace}px`}
@@ -611,8 +601,6 @@
 
 	.editor-mount :global(.writing-surface p) {
 		margin: 0 0 var(--paragraph-gap);
-		orphans: 1;
-		widows: 1;
 	}
 
 	.editor-mount :global(.writing-surface p + p) {

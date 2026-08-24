@@ -84,7 +84,7 @@ export const marketingPages = [
 				heading: 'Typeset once, then export PDF and EPUB',
 				paragraphs: [
 					'Choose a trim-size and typography preset, add front and back covers, and place raster images or SVG artwork inside the manuscript. Artwork can be aligned and resized directly in the writing surface.',
-					'When the draft is ready, print the matching book layout or choose Save as PDF, then download an EPUB 3 file for e-readers. The exporters carry book pages, chapters, covers, and artwork into the finished files.'
+					'When the draft is ready, download a typeset PDF for review or print and an EPUB 3 file for e-readers. The exporter carries book pages, chapters, covers, and artwork into the finished files.'
 				]
 			}
 		],
@@ -248,12 +248,12 @@ export const marketingPages = [
 		eyebrow: 'Draft to designed book',
 		heading: 'WYSIWYG book typesetting software for novelists',
 		introduction:
-			'WriteANovel treats formatting as part of a clear publishing workflow. Writers can compose visually, choose sensible book presets, add pages and artwork, then print, save as PDF, or download EPUB from the same project.',
+			'WriteANovel treats formatting as part of a clear publishing workflow. Writers can compose visually, choose sensible book presets, add pages and artwork, then download PDF and EPUB files directly from the same project.',
 		highlights: [
 			'6 × 9 inch and A5 trim presets',
 			'Libre Baskerville book typography',
 			'Raster image and SVG placement',
-			'Matching print/PDF layout and EPUB 3 downloads'
+			'Direct PDF and EPUB 3 downloads'
 		],
 		sections: [
 			{
@@ -288,18 +288,18 @@ export const marketingPages = [
 			},
 			{
 				eyebrow: 'Files you can take elsewhere',
-				heading: 'Save fixed pages as PDF and download EPUB for reflowable reading',
+				heading: 'Download PDF for fixed pages and EPUB for reflowable reading',
 				paragraphs: [
-					'The browser print flow uses the same layout engine as the writing preview. Choose Save as PDF in the print dialog for proofreading, sharing a fixed layout, or preparing a print-oriented copy.',
+					'PDF export creates a downloadable, typeset file rather than sending the writer through a browser print dialog. It is suited to proofreading, sharing a fixed layout, and preparing a print-oriented copy.',
 					'EPUB 3 export packages the reading order, chapters, book pages, covers, and media for e-readers and downstream publishing tools. Both formats leave the browser as ordinary files the writer controls.'
 				]
 			}
 		],
 		faq: [
 			{
-				question: 'How do I save the book as a PDF?',
+				question: 'Does PDF export download an actual PDF file?',
 				answer:
-					'Choose Print / PDF, then select Save as PDF in the browser print dialog. This keeps the saved PDF aligned with the book preview and works while the app is offline.'
+					'Yes. WriteANovel generates and downloads a PDF directly instead of relying on the browser print dialog.'
 			},
 			{
 				question: 'Can I use SVG artwork as well as normal images?',

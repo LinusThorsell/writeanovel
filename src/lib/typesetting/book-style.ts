@@ -17,7 +17,9 @@ export type BookPageMetrics = {
 
 export type BookTypographyStyle = {
 	editorFontFamily: string;
+	pdfFont: 'Literary' | 'Manrope';
 	bodyFontSizePt: number;
+	editorBodyFontSizeRem: number;
 	lineHeight: number;
 	documentTitleScale: number;
 	documentLabelScale: number;
@@ -58,7 +60,9 @@ export const BOOK_LAYOUT = {
 const BOOK_TYPOGRAPHY: Record<TypographyPreset, BookTypographyStyle> = {
 	literary: {
 		editorFontFamily: "'Libre Baskerville', Georgia, serif",
+		pdfFont: 'Literary',
 		bodyFontSizePt: 10,
+		editorBodyFontSizeRem: 1,
 		lineHeight: 1.62,
 		documentTitleScale: 1.8,
 		documentLabelScale: 0.78,
@@ -68,7 +72,9 @@ const BOOK_TYPOGRAPHY: Record<TypographyPreset, BookTypographyStyle> = {
 	},
 	classic: {
 		editorFontFamily: "'Libre Baskerville', Georgia, serif",
+		pdfFont: 'Literary',
 		bodyFontSizePt: 10.4,
+		editorBodyFontSizeRem: 1.04,
 		lineHeight: 1.58,
 		documentTitleScale: 1.72,
 		documentLabelScale: 0.76,
@@ -78,7 +84,9 @@ const BOOK_TYPOGRAPHY: Record<TypographyPreset, BookTypographyStyle> = {
 	},
 	modern: {
 		editorFontFamily: "'Manrope Variable', sans-serif",
+		pdfFont: 'Manrope',
 		bodyFontSizePt: 10.5,
+		editorBodyFontSizeRem: 0.98,
 		lineHeight: 1.56,
 		documentTitleScale: 1.75,
 		documentLabelScale: 0.76,
