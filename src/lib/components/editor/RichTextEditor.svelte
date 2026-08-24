@@ -4,6 +4,7 @@
 		AlignLeft,
 		AlignRight,
 		Bold,
+		Files,
 		ImagePlus,
 		Italic,
 		Link,
@@ -24,13 +25,15 @@
 		hydrateAssetSources,
 		removeTransientAssetSources
 	} from '$lib/application/media-service';
-	import type { RichTextNode, TypographyPreset } from '$lib/domain/types';
+	import type { RichTextNode, TrimSize, TypographyPreset } from '$lib/domain/types';
 	import { editorExtensions } from '$lib/editor/extensions';
+	import { calculateEditorPageLayout } from '$lib/editor/page-layout';
 
 	type Props = {
 		body: RichTextNode;
 		assetUrls: ReadonlyMap<string, string>;
 		typography: TypographyPreset;
+		trimSize: TrimSize;
 		placeholder?: string;
 		onChange: (body: RichTextNode) => void;
 		onAddMedia: (file: File) => Promise<MediaInsertion>;
@@ -41,6 +44,7 @@
 		body,
 		assetUrls,
 		typography,
+		trimSize,
 		placeholder = 'Begin writing…',
 		onChange,
 		onAddMedia,
@@ -49,8 +53,33 @@
 
 	let editor = $state.raw<Editor>();
 	let revision = $state(0);
+	let pageCount = $state(1);
+	let pageHeight = $state(1_104);
+	let pageGap = $state(32);
+	let pageMarginBlock = $state(88);
 	let mediaInput = $state<HTMLInputElement>();
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
+	const pageNumbers = $derived(Array.from({ length: pageCount }, (_, index) => index + 1));
+	const canvasHeight = $derived(pageCount * pageHeight + (pageCount - 1) * pageGap);
+
+	function updatePaperLayout(element: HTMLElement): void {
+		if (element.clientWidth <= 0) return;
+		const layout = calculateEditorPageLayout(trimSize, element.clientWidth);
+		pageHeight = layout.pageHeight;
+		pageGap = layout.pageGap;
+		pageMarginBlock = layout.pageMarginBlock;
+	}
+
+	const observePaper: Attachment<HTMLElement> = (element) => {
+		updatePaperLayout(element);
+		const resizeObserver = new ResizeObserver(() => updatePaperLayout(element));
+		resizeObserver.observe(element);
+
+		return () => {
+			resizeObserver.disconnect();
+		};
+	};
+
 	const captureMediaInput: Attachment<HTMLInputElement> = (element) => {
 		mediaInput = element;
 		return () => {
@@ -62,7 +91,11 @@
 		const initialBody = untrack(() => hydrateAssetSources(body, assetUrls));
 		const instance = new Editor({
 			element,
-			extensions: editorExtensions(placeholder),
+			extensions: editorExtensions(placeholder, {
+				onPageCount: (nextPageCount) => {
+					pageCount = nextPageCount;
+				}
+			}),
 			content: initialBody,
 			editorProps: {
 				attributes: {
@@ -251,6 +284,11 @@
 			onchange={insertMedia}
 		/>
 		<span class="toolbar-spacer"></span>
+		<span class="pagination-status" aria-label="Manuscript pagination">
+			<Files size={16} />
+			{pageCount}
+			{pageCount === 1 ? 'page' : 'pages'}
+		</span>
 		<button type="button" aria-label="Undo" onclick={() => editor?.chain().focus().undo().run()}
 			><Undo2 size={18} /></button
 		>
@@ -275,12 +313,29 @@
 		</div>
 	{/if}
 
-	<div class="paper" {@attach mountEditor}></div>
+	<div
+		class="paper"
+		{@attach observePaper}
+		style:--page-height={`${pageHeight}px`}
+		style:--page-gap={`${pageGap}px`}
+		style:--page-margin-block={`${pageMarginBlock}px`}
+		style:--canvas-height={`${canvasHeight}px`}
+	>
+		<div class="page-stack" aria-hidden="true">
+			{#each pageNumbers as pageNumber (pageNumber)}
+				<div class="page-sheet"><span>Page {pageNumber}</span></div>
+			{/each}
+		</div>
+		<div class="editor-mount" {@attach mountEditor}></div>
+	</div>
 </div>
 
 <style>
 	.editor-shell {
+		width: 100%;
+		min-width: 0;
 		min-height: 100%;
+		overflow-x: clip;
 		background: #e9e4db;
 	}
 
@@ -341,6 +396,18 @@
 		flex: 1 0 1rem;
 	}
 
+	.pagination-status {
+		display: inline-flex;
+		flex: 0 0 auto;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0 0.45rem;
+		color: var(--ink-soft);
+		font-size: 0.72rem;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
 	.image-toolbar {
 		display: flex;
 		align-items: center;
@@ -363,101 +430,154 @@
 	}
 
 	.paper {
+		position: relative;
 		width: min(46rem, calc(100% - 2rem));
-		min-height: 64rem;
+		min-width: 0;
+		min-height: var(--canvas-height);
 		margin: 2rem auto 6rem;
+		isolation: isolate;
+	}
+
+	.page-stack {
+		position: absolute;
+		z-index: 0;
+		inset: 0 0 auto;
+		display: grid;
+		gap: var(--page-gap);
+		pointer-events: none;
+	}
+
+	.page-sheet {
+		position: relative;
+		height: var(--page-height);
 		background: #fffefb;
 		box-shadow: 0 8px 30px rgb(47 48 43 / 13%);
 	}
 
-	.paper :global(.writing-surface) {
-		min-height: 64rem;
-		padding: 5.5rem clamp(2rem, 9vw, 6rem);
+	.page-sheet span {
+		position: absolute;
+		right: clamp(1.4rem, 12%, 5.5rem);
+		bottom: 1.35rem;
+		color: #96958f;
+		font-family: 'Manrope Variable', sans-serif;
+		font-size: 0.65rem;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.editor-mount {
+		position: relative;
+		z-index: 1;
+		min-width: 0;
+	}
+
+	.editor-mount :global(.writing-surface) {
+		box-sizing: border-box;
+		width: 100%;
+		min-width: 0;
+		min-height: var(--canvas-height);
+		padding: var(--page-margin-block) clamp(1.4rem, 12%, 5.5rem);
 		color: #171a18;
+		background: transparent;
 		font-size: 1rem;
 		line-height: 1.72;
 		hyphens: auto;
+		overflow-wrap: anywhere;
+		word-break: normal;
 		text-wrap: pretty;
 		outline: none;
 	}
 
-	.literary .paper :global(.writing-surface) {
+	.literary .editor-mount :global(.writing-surface) {
 		font-family: 'Libre Baskerville', Georgia, serif;
 	}
 
-	.classic .paper :global(.writing-surface) {
+	.classic .editor-mount :global(.writing-surface) {
 		font-family: Georgia, 'Times New Roman', serif;
 		font-size: 1.04rem;
 	}
 
-	.modern .paper :global(.writing-surface) {
+	.modern .editor-mount :global(.writing-surface) {
 		font-family: 'Manrope Variable', sans-serif;
 		font-size: 0.98rem;
 		line-height: 1.68;
 	}
 
-	.paper :global(.writing-surface p) {
+	.editor-mount :global(.page-break-decoration) {
+		display: block;
+		width: 100%;
+		height: calc(var(--page-margin-block) * 2 + var(--page-gap));
+		margin: 0;
+		pointer-events: none;
+		user-select: none;
+	}
+
+	.editor-mount :global(.pagination-measuring .page-break-decoration) {
+		display: none;
+	}
+
+	.editor-mount :global(.writing-surface p) {
 		margin: 0 0 0.2rem;
 	}
 
-	.paper :global(.writing-surface p + p) {
+	.editor-mount :global(.writing-surface p + p) {
 		text-indent: 1.5em;
 	}
 
-	.paper :global(.writing-surface h1),
-	.paper :global(.writing-surface h2),
-	.paper :global(.writing-surface h3) {
+	.editor-mount :global(.writing-surface h1),
+	.editor-mount :global(.writing-surface h2),
+	.editor-mount :global(.writing-surface h3) {
 		margin: 2.2em 0 0.8em;
 		line-height: 1.25;
 		text-wrap: balance;
 	}
 
-	.paper :global(.writing-surface h1) {
+	.editor-mount :global(.writing-surface h1) {
 		font-size: 1.75rem;
 		text-align: center;
 	}
 
-	.paper :global(.writing-surface h2) {
+	.editor-mount :global(.writing-surface h2) {
 		font-size: 1.35rem;
 	}
 
-	.paper :global(.writing-surface h3) {
+	.editor-mount :global(.writing-surface h3) {
 		font-size: 1.08rem;
 	}
 
-	.paper :global(.writing-surface blockquote) {
+	.editor-mount :global(.writing-surface blockquote) {
 		margin: 1.5rem 2rem;
 		color: #48524d;
 		font-style: italic;
 	}
 
-	.paper :global(.writing-surface img) {
+	.editor-mount :global(.writing-surface img) {
 		display: block;
 		max-width: 100%;
+		max-height: calc(var(--page-height) - var(--page-margin-block) * 2);
 		height: auto;
 		margin: 0;
 		border-radius: 0.15rem;
 	}
 
-	.paper :global([data-resize-container]) {
+	.editor-mount :global([data-resize-container]) {
 		max-width: 100%;
 		justify-content: center;
 		margin: 1.5rem 0;
 	}
 
-	.paper :global([data-resize-container]:has(img[data-alignment='left'])) {
+	.editor-mount :global([data-resize-container]:has(img[data-alignment='left'])) {
 		justify-content: flex-start;
 	}
 
-	.paper :global([data-resize-container]:has(img[data-alignment='right'])) {
+	.editor-mount :global([data-resize-container]:has(img[data-alignment='right'])) {
 		justify-content: flex-end;
 	}
 
-	.paper :global([data-resize-wrapper]) {
+	.editor-mount :global([data-resize-wrapper]) {
 		max-width: 100%;
 	}
 
-	.paper :global([data-resize-handle]) {
+	.editor-mount :global([data-resize-handle]) {
 		z-index: 2;
 		width: 0.8rem;
 		height: 0.8rem;
@@ -467,33 +587,33 @@
 		box-shadow: 0 1px 4px rgb(22 35 29 / 25%);
 	}
 
-	.paper :global([data-resize-handle='top-left']),
-	.paper :global([data-resize-handle='bottom-right']) {
+	.editor-mount :global([data-resize-handle='top-left']),
+	.editor-mount :global([data-resize-handle='bottom-right']) {
 		cursor: nwse-resize;
 	}
 
-	.paper :global([data-resize-handle='top-right']),
-	.paper :global([data-resize-handle='bottom-left']) {
+	.editor-mount :global([data-resize-handle='top-right']),
+	.editor-mount :global([data-resize-handle='bottom-left']) {
 		cursor: nesw-resize;
 	}
 
-	.paper :global([data-resize-handle='top-left']) {
+	.editor-mount :global([data-resize-handle='top-left']) {
 		transform: translate(-50%, -50%);
 	}
 
-	.paper :global([data-resize-handle='top-right']) {
+	.editor-mount :global([data-resize-handle='top-right']) {
 		transform: translate(50%, -50%);
 	}
 
-	.paper :global([data-resize-handle='bottom-left']) {
+	.editor-mount :global([data-resize-handle='bottom-left']) {
 		transform: translate(-50%, 50%);
 	}
 
-	.paper :global([data-resize-handle='bottom-right']) {
+	.editor-mount :global([data-resize-handle='bottom-right']) {
 		transform: translate(50%, 50%);
 	}
 
-	.paper :global(.writing-surface p.is-editor-empty:first-child::before) {
+	.editor-mount :global(.writing-surface p.is-editor-empty:first-child::before) {
 		float: left;
 		height: 0;
 		color: #a5aaa6;
@@ -505,11 +625,14 @@
 		.paper {
 			width: 100%;
 			margin: 0;
+		}
+
+		.page-sheet {
 			box-shadow: none;
 		}
 
-		.paper :global(.writing-surface) {
-			padding: 2.5rem 1.4rem 7rem;
+		.editor-mount :global(.writing-surface) {
+			padding-inline: 1.4rem;
 		}
 	}
 </style>

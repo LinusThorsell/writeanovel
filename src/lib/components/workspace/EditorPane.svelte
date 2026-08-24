@@ -115,6 +115,7 @@
 						body={model.activeDocument.body}
 						assetUrls={model.assetUrls}
 						typography={model.workspace?.project.typography ?? 'literary'}
+						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
 						placeholder={model.activeDocument.kind === 'chapter'
 							? 'Begin this chapter…'
 							: 'Write this page…'}
@@ -129,6 +130,7 @@
 						body={model.activeNote.body}
 						assetUrls={model.assetUrls}
 						typography="modern"
+						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
 						placeholder="Add details, ideas, relationships, and reminders…"
 						onChange={(body) => model.updateNoteBody(model.activeNote!.id, body)}
 						onAddMedia={(file) => model.addMedia(file)}
@@ -165,8 +167,10 @@
 		position: relative;
 		display: flex;
 		min-width: 0;
+		min-height: 0;
 		height: 100%;
 		flex-direction: column;
+		overflow: hidden;
 		background: #e9e4db;
 	}
 
@@ -242,9 +246,12 @@
 	}
 
 	.editor-area {
+		min-width: 0;
 		min-height: 0;
 		flex: 1;
+		overflow-x: hidden;
 		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
 
 	.status-bar {

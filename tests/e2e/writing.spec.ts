@@ -54,6 +54,122 @@ test('creates, orders, writes, and persists a multi-file novel locally', async (
 	await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 });
 
+test('flows a long chapter across pages without breaking the workspace layout', async ({
+	page
+}) => {
+	await createNovel(page, 'The Long Road');
+	const paragraphs = Array.from(
+		{ length: 150 },
+		(_, index) =>
+			`Passage ${index + 1}. The road crossed the valley while the evening light changed over the hills, and the travellers kept moving toward the distant town.`
+	);
+	paragraphs.splice(75, 0, `A${'verylongword'.repeat(180)}`);
+
+	const editor = page.locator('.writing-surface');
+	await editor.fill(paragraphs.join('\n\n'));
+
+	const pagination = page.getByLabel('Manuscript pagination');
+	await expect(pagination).toContainText(/\d+\s+pages/);
+	await expect
+		.poll(async () => {
+			const label = (await pagination.textContent()) ?? '';
+			return Number.parseInt(label, 10);
+		})
+		.toBeGreaterThan(2);
+	const displayedPageCount = Number.parseInt((await pagination.textContent()) ?? '', 10);
+	await expect(page.locator('.page-sheet')).toHaveCount(displayedPageCount);
+	await expect(page.locator('.page-break-decoration')).toHaveCount(displayedPageCount - 1);
+
+	const textClearsPageGaps = await editor.evaluate((element) => {
+		const gaps = Array.from(element.querySelectorAll<HTMLElement>('.page-break-decoration')).map(
+			(gap) => gap.getBoundingClientRect()
+		);
+		const textRectangles: DOMRect[] = [];
+		const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+		let textNode = walker.nextNode();
+		while (textNode) {
+			if (textNode.parentElement?.closest('.page-break-decoration')) {
+				textNode = walker.nextNode();
+				continue;
+			}
+			const range = document.createRange();
+			range.selectNodeContents(textNode);
+			textRectangles.push(...Array.from(range.getClientRects()));
+			textNode = walker.nextNode();
+		}
+
+		return gaps.every((gap) =>
+			textRectangles.every((text) => text.bottom <= gap.top + 1 || text.top >= gap.bottom - 1)
+		);
+	});
+	expect(textClearsPageGaps).toBe(true);
+
+	await editor.focus();
+	await page.keyboard.press('Control+End');
+	await page.keyboard.type('\n\nThis sentence was added after automatic pagination.');
+	await expect(editor).toContainText('added after automatic pagination');
+
+	const layoutFits = await page.evaluate(() => {
+		const workspace = document.querySelector<HTMLElement>('.workspace-page');
+		const editorArea = document.querySelector<HTMLElement>('.editor-area');
+		const writingSurface = document.querySelector<HTMLElement>('.writing-surface');
+		const topbar = document.querySelector<HTMLElement>('.topbar');
+		const editorToolbar = document.querySelector<HTMLElement>('.toolbar');
+		if (!workspace || !editorArea || !writingSurface || !topbar || !editorToolbar) return false;
+
+		const areaRect = editorArea.getBoundingClientRect();
+		const surfaceRect = writingSurface.getBoundingClientRect();
+		const toolbarRect = editorToolbar.getBoundingClientRect();
+		return (
+			document.documentElement.scrollWidth <= document.documentElement.clientWidth &&
+			workspace.scrollWidth <= workspace.clientWidth &&
+			workspace.scrollHeight <= workspace.clientHeight &&
+			workspace.scrollTop === 0 &&
+			editorArea.scrollWidth <= editorArea.clientWidth &&
+			editorArea.scrollHeight > editorArea.clientHeight &&
+			editorArea.clientHeight < window.innerHeight &&
+			Math.abs(topbar.getBoundingClientRect().top) < 1 &&
+			Math.abs(toolbarRect.top - areaRect.top) < 1 &&
+			toolbarRect.bottom <= areaRect.bottom &&
+			surfaceRect.left >= areaRect.left - 1 &&
+			surfaceRect.right <= areaRect.right + 1
+		);
+	});
+	expect(layoutFits).toBe(true);
+
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect.poll(async () => page.locator('.page-break-decoration').count()).toBeGreaterThan(2);
+	const mobileLayoutFits = await page.evaluate(() => {
+		const workspace = document.querySelector<HTMLElement>('.workspace-page');
+		const editorArea = document.querySelector<HTMLElement>('.editor-area');
+		const topbar = document.querySelector<HTMLElement>('.topbar');
+		const editorToolbar = document.querySelector<HTMLElement>('.toolbar');
+		return Boolean(
+			workspace &&
+			workspace.scrollWidth <= workspace.clientWidth &&
+			workspace.scrollHeight <= workspace.clientHeight &&
+			workspace.scrollTop === 0 &&
+			editorArea &&
+			editorArea.scrollWidth <= editorArea.clientWidth &&
+			editorArea.scrollHeight > editorArea.clientHeight &&
+			topbar &&
+			Math.abs(topbar.getBoundingClientRect().top) < 1 &&
+			editorToolbar &&
+			Math.abs(editorToolbar.getBoundingClientRect().top - editorArea.getBoundingClientRect().top) <
+				1 &&
+			document.documentElement.scrollWidth <= document.documentElement.clientWidth
+		);
+	});
+	expect(mobileLayoutFits).toBe(true);
+
+	await page.waitForTimeout(700);
+	await page.reload();
+	await page.getByRole('button', { name: /The Long Road/ }).click();
+	await expect(editor).toContainText('Passage 150');
+	await expect(editor).toContainText('added after automatic pagination');
+	await expect.poll(async () => page.locator('.page-break-decoration').count()).toBeGreaterThan(1);
+});
+
 test('anonymous free writing makes no PocketBase requests', async ({ page }) => {
 	const backendRequests: string[] = [];
 	page.on('request', (request) => {

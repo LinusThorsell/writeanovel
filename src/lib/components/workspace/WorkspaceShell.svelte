@@ -113,6 +113,8 @@
 
 <style>
 	.workspace-page {
+		min-width: 0;
+		min-height: 0;
 		height: 100vh;
 		overflow: hidden;
 		background: #e9e4db;
@@ -271,8 +273,11 @@
 
 	.workspace-grid {
 		display: grid;
+		min-width: 0;
+		min-height: 0;
 		height: calc(100vh - 3.45rem);
 		grid-template-columns: 17.5rem minmax(0, 1fr);
+		overflow: hidden;
 	}
 
 	.sidebar,
