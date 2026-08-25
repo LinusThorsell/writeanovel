@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { AlertCircle, CheckCircle2, X } from '@lucide/svelte';
+	import { monitorServiceWorkerUpdates } from '$lib/application/service-worker-updates';
 	import { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import AccountModal from '$lib/components/account/AccountModal.svelte';
 	import ProjectLibrary from '$lib/components/library/ProjectLibrary.svelte';
@@ -9,10 +10,14 @@
 	const state = new WriteANovelState();
 
 	onMount(() => {
+		const stopMonitoringServiceWorker = monitorServiceWorkerUpdates();
+
 		state.initialize().catch((error) => {
 			state.loading = false;
 			state.showError(error instanceof Error ? error.message : 'WriteANovel could not start.');
 		});
+
+		return stopMonitoringServiceWorker;
 	});
 </script>
 
