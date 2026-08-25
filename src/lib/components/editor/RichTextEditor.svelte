@@ -10,8 +10,10 @@
 		Link,
 		List,
 		ListOrdered,
+		Maximize2,
 		MessageSquarePlus,
 		MessagesSquare,
+		Minimize2,
 		Quote,
 		Redo2,
 		Send,
@@ -22,7 +24,7 @@
 		X
 	} from '@lucide/svelte';
 	import { Editor } from '@tiptap/core';
-	import { untrack } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import type { MediaInsertion } from '$lib/application/writeanovel-state.svelte';
 	import {
@@ -52,10 +54,15 @@
 		assetUrls: ReadonlyMap<string, string>;
 		typography: TypographyPreset;
 		trimSize: TrimSize;
+		distractionFree: boolean;
+		focusNavigation: Snippet;
+		itemTitle: string;
 		typesetHeading?: TypesetDocumentHeading;
 		placeholder?: string;
 		onChange: (body: RichTextNode) => void;
 		onCommentsChange: (body: RichTextNode, comments: CommentThread[]) => void;
+		onToggleDistractionFree: () => void | Promise<void>;
+		onTitleCommit: (title: string) => void;
 		onAddMedia: (file: File) => Promise<MediaInsertion>;
 		onError: (message: string) => void;
 	};
@@ -67,10 +74,15 @@
 		assetUrls,
 		typography,
 		trimSize,
+		distractionFree,
+		focusNavigation,
+		itemTitle,
 		typesetHeading,
 		placeholder = 'Begin writing…',
 		onChange,
 		onCommentsChange,
+		onToggleDistractionFree,
+		onTitleCommit,
 		onAddMedia,
 		onError
 	}: Props = $props();
@@ -533,9 +545,37 @@
 		];
 		return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 	}
+
+	function commitFocusTitle(event: FocusEvent): void {
+		onTitleCommit((event.currentTarget as HTMLInputElement).value);
+	}
+
+	function blurFocusTitleOnEnter(event: KeyboardEvent): void {
+		if (event.key === 'Enter') (event.currentTarget as HTMLInputElement).blur();
+	}
 </script>
 
-<div class="editor-shell">
+<div class="editor-shell" class:distraction-free={distractionFree}>
+	{#if distractionFree}
+		<div class="focus-topbar" aria-label="Distraction-free writing controls">
+			<div class="focus-navigation-slot">{@render focusNavigation()}</div>
+			<input
+				class="focus-title"
+				aria-label="Page title in distraction-free mode"
+				value={itemTitle}
+				onblur={commitFocusTitle}
+				onkeydown={blurFocusTitleOnEnter}
+			/>
+			<button
+				type="button"
+				class="focus-exit-button"
+				aria-label="Exit distraction-free mode"
+				title="Exit distraction-free mode"
+				onclick={onToggleDistractionFree}><Minimize2 size={18} /></button
+			>
+		</div>
+	{/if}
+
 	<div class="toolbar" aria-label="Text formatting">
 		<select
 			class="block-select"
@@ -639,6 +679,16 @@
 			{#if comments.length > 0}<span class="comment-count">{comments.length}</span>{/if}
 		</button>
 		<span class="toolbar-spacer"></span>
+		{#if !distractionFree}
+			<button
+				type="button"
+				aria-label="Enter distraction-free mode"
+				aria-pressed="false"
+				title="Write without distractions"
+				onclick={onToggleDistractionFree}><Maximize2 size={18} /></button
+			>
+			<span class="divider"></span>
+		{/if}
 		<button type="button" aria-label="Undo" onclick={() => editor?.chain().focus().undo().run()}
 			><Undo2 size={18} /></button
 		>
@@ -861,6 +911,63 @@
 		backdrop-filter: blur(10px);
 	}
 
+	.editor-shell.distraction-free .toolbar {
+		top: 3.25rem;
+	}
+
+	.focus-topbar {
+		position: sticky;
+		z-index: 6;
+		top: 0;
+		display: grid;
+		min-height: 3.25rem;
+		grid-template-columns: minmax(10rem, 1fr) minmax(14rem, 32rem) minmax(10rem, 1fr);
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.4rem 0.75rem;
+		background: rgb(251 248 242 / 98%);
+		border-bottom: 1px solid var(--line);
+		backdrop-filter: blur(12px);
+	}
+
+	.focus-title {
+		box-sizing: border-box;
+		width: 100%;
+		min-width: 0;
+		padding: 0.42rem 0.75rem;
+		color: var(--ink);
+		text-align: center;
+		background: white;
+		border: 1px solid var(--line);
+		border-radius: 0.45rem;
+		font-family: 'Libre Baskerville', serif;
+		font-size: 0.88rem;
+		font-weight: 700;
+	}
+
+	.focus-title:focus {
+		border-color: var(--forest);
+		outline: 2px solid rgb(39 72 59 / 12%);
+	}
+
+	.focus-exit-button {
+		display: grid;
+		width: 2.15rem;
+		height: 2.15rem;
+		justify-self: end;
+		place-items: center;
+		padding: 0;
+		color: var(--ink-soft);
+		background: transparent;
+		border: 0;
+		border-radius: 0.42rem;
+	}
+
+	.focus-exit-button:hover {
+		color: var(--forest-deep);
+		background: rgb(39 72 59 / 11%);
+	}
+
 	.toolbar button,
 	.image-toolbar button {
 		position: relative;
@@ -929,6 +1036,13 @@
 		flex: 1 0 1rem;
 	}
 
+	.focus-navigation-slot {
+		display: flex;
+		flex: 0 0 auto;
+		align-items: center;
+		justify-self: start;
+	}
+
 	.image-toolbar {
 		display: flex;
 		align-items: center;
@@ -974,6 +1088,11 @@
 		background: #fffefb;
 		box-shadow: 0 8px 30px rgb(47 48 43 / 13%);
 		isolation: isolate;
+	}
+
+	.editor-shell.distraction-free .paper {
+		width: min(64rem, calc(100% - 3rem));
+		margin-top: 2.5rem;
 	}
 
 	.typeset-document-heading {
@@ -1541,6 +1660,17 @@
 	}
 
 	@media (max-width: 760px) {
+		.focus-topbar {
+			grid-template-columns: 10rem minmax(7rem, 1fr) auto;
+			gap: 0.4rem;
+			padding-inline: 0.5rem;
+		}
+
+		.focus-title {
+			padding-inline: 0.45rem;
+			font-size: 0.78rem;
+		}
+
 		.paper {
 			width: 100%;
 			margin: 0;

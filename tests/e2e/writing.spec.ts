@@ -174,6 +174,110 @@ test('anchors comment threads to edited manuscript text and persists replies', a
 	await expect(anchor).toHaveCount(0);
 });
 
+test('expands the manuscript into distraction-free writing mode', async ({ page }) => {
+	await createNovel(page, 'Focused Story');
+	const paper = page.locator('.paper');
+	const standardWidth = await paper.evaluate((element) => element.getBoundingClientRect().width);
+
+	await page.getByRole('button', { name: 'Enter distraction-free mode' }).click();
+	await expect(page.locator('.workspace-page')).toHaveClass(/distraction-free/);
+	await expect(page.locator('.topbar')).toBeHidden();
+	await expect(page.locator('.sidebar')).toBeHidden();
+	await expect(page.locator('.item-header')).toBeHidden();
+	await expect(page.locator('.status-bar')).toBeHidden();
+	await expect(page.getByRole('button', { name: 'Exit distraction-free mode' })).toBeVisible();
+	const focusedWidth = await paper.evaluate((element) => element.getBoundingClientRect().width);
+	expect(focusedWidth).toBeGreaterThan(standardWidth);
+	const focusTitle = page.getByLabel('Page title in distraction-free mode');
+	await expect(focusTitle).toHaveValue('Chapter 1');
+	const titleCenterOffset = await focusTitle.evaluate((element) => {
+		const bounds = element.getBoundingClientRect();
+		return Math.abs((bounds.left + bounds.right) / 2 - window.innerWidth / 2);
+	});
+	expect(titleCenterOffset).toBeLessThan(2);
+	await focusTitle.fill('Opening Scene');
+	await focusTitle.press('Enter');
+	await expect(
+		page.getByRole('button', { name: 'Open focus navigation, current item: Opening Scene' })
+	).toBeVisible();
+
+	await page
+		.getByRole('button', { name: 'Open focus navigation, current item: Opening Scene' })
+		.click();
+	const focusNavigation = page.locator('.focus-navigation-menu');
+	await expect(focusNavigation).toBeVisible();
+	const menuPresentation = await focusNavigation.evaluate((element) => {
+		const bounds = element.getBoundingClientRect();
+		const toolbarBounds = document.querySelector('.toolbar')?.getBoundingClientRect();
+		const foreground = document.elementFromPoint(bounds.left + 8, bounds.top + 8);
+		return {
+			height: bounds.height,
+			extendsBelowToolbar: bounds.bottom > (toolbarBounds?.bottom ?? 0) + 200,
+			isForeground: foreground === element || element.contains(foreground)
+		};
+	});
+	expect(menuPresentation.height).toBeGreaterThan(300);
+	expect(menuPresentation.extendsBelowToolbar).toBe(true);
+	expect(menuPresentation.isForeground).toBe(true);
+	await expect(focusNavigation.getByText('Work', { exact: true })).toBeVisible();
+	await expect(focusNavigation.getByText('Front pages', { exact: true })).toBeVisible();
+	await expect(focusNavigation.getByText('Chapters', { exact: true })).toBeVisible();
+	await expect(focusNavigation.getByText('Back pages', { exact: true })).toBeVisible();
+	await expect(focusNavigation.getByText('Notes', { exact: true })).toBeVisible();
+	for (const section of ['Characters', 'Places', 'Plotlines', 'Planning']) {
+		await expect(focusNavigation.getByText(section, { exact: true })).toBeVisible();
+	}
+	const addFrontPage = page.getByRole('button', {
+		name: 'Add a front page from focus navigation'
+	});
+	await addFrontPage.click();
+	for (const pageType of ['Title page', 'Copyright', 'Dedication', 'Epigraph', 'Preface']) {
+		await expect(
+			focusNavigation.getByRole('button', { name: pageType, exact: true })
+		).toBeVisible();
+	}
+	await addFrontPage.click();
+	const addBackPage = page.getByRole('button', {
+		name: 'Add a back page from focus navigation'
+	});
+	await addBackPage.click();
+	for (const pageType of ['Acknowledgements', 'About the author']) {
+		await expect(
+			focusNavigation.getByRole('button', { name: pageType, exact: true })
+		).toBeVisible();
+	}
+	await addBackPage.click();
+	for (const section of ['characters', 'places', 'plotlines', 'planning']) {
+		await expect(
+			page.getByRole('button', { name: `Add ${section} from focus navigation` })
+		).toBeVisible();
+	}
+
+	await page.getByRole('button', { name: 'Add chapter from focus navigation' }).click();
+	await expect(
+		page.getByRole('button', { name: 'Open focus navigation, current item: Chapter 2' })
+	).toBeVisible();
+	await expect(page.locator('.workspace-page')).toHaveClass(/distraction-free/);
+	await page
+		.getByRole('button', { name: 'Open focus navigation, current item: Chapter 2' })
+		.click();
+	await page.getByRole('button', { name: 'Open chapter 1: Opening Scene' }).click();
+	await expect(
+		page.getByRole('button', { name: 'Open focus navigation, current item: Opening Scene' })
+	).toBeVisible();
+
+	await page.getByRole('button', { name: 'Exit distraction-free mode' }).click();
+	await expect(page.locator('.workspace-page')).not.toHaveClass(/distraction-free/);
+	await expect(page.locator('.topbar')).toBeVisible();
+	await expect(page.getByLabel('Page title')).toHaveValue('Opening Scene');
+	await page.reload();
+	await expect(page.getByLabel('Page title')).toHaveValue('Opening Scene');
+
+	await page.getByRole('button', { name: 'Enter distraction-free mode' }).click();
+	await page.keyboard.press('Escape');
+	await expect(page.locator('.workspace-page')).not.toHaveClass(/distraction-free/);
+});
+
 test('keeps a long chapter on one continuous scrollable page and restores the writing position after reload', async ({
 	page
 }) => {

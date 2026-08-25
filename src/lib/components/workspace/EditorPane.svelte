@@ -15,8 +15,15 @@
 	import RichTextEditor from '$lib/components/editor/RichTextEditor.svelte';
 	import ChapterHeadingModal from '$lib/components/settings/ChapterHeadingModal.svelte';
 	import { typesetDocumentHeading, type TypesetDocumentHeading } from '$lib/typesetting/book-style';
+	import FocusNavigationMenu from './FocusNavigationMenu.svelte';
 
-	let { model }: { model: WriteANovelState } = $props();
+	type Props = {
+		model: WriteANovelState;
+		distractionFree: boolean;
+		onToggleDistractionFree: () => void | Promise<void>;
+	};
+
+	let { model, distractionFree, onToggleDistractionFree }: Props = $props();
 	let chapterHeadingOpen = $state(false);
 	const typesetHeading: TypesetDocumentHeading | undefined = $derived.by(() => {
 		if (!model.workspace || !model.activeDocument) return undefined;
@@ -28,7 +35,11 @@
 	});
 
 	function commitTitle(event: FocusEvent): void {
-		model.updateActiveTitle((event.currentTarget as HTMLInputElement).value);
+		updateTitle((event.currentTarget as HTMLInputElement).value);
+	}
+
+	function updateTitle(title: string): void {
+		void model.updateActiveTitle(title);
 	}
 
 	function blurOnEnter(event: KeyboardEvent): void {
@@ -72,7 +83,11 @@
 	}
 </script>
 
-<main>
+{#snippet focusNavigation()}
+	<FocusNavigationMenu {model} />
+{/snippet}
+
+<main class:distraction-free={distractionFree}>
 	{#if model.activeDocument || model.activeNote}
 		<header class="item-header">
 			<div class="title-area">
@@ -146,6 +161,11 @@
 						assetUrls={model.assetUrls}
 						typography={model.workspace?.project.typography ?? 'literary'}
 						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
+						{distractionFree}
+						{onToggleDistractionFree}
+						{focusNavigation}
+						itemTitle={model.activeDocument.title}
+						onTitleCommit={updateTitle}
 						{typesetHeading}
 						placeholder={model.activeDocument.kind === 'chapter'
 							? 'Begin this chapter…'
@@ -166,6 +186,11 @@
 						assetUrls={model.assetUrls}
 						typography="modern"
 						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
+						{distractionFree}
+						{onToggleDistractionFree}
+						{focusNavigation}
+						itemTitle={model.activeNote.title}
+						onTitleCommit={updateTitle}
 						placeholder="Add details, ideas, relationships, and reminders…"
 						onChange={(body) => model.updateNoteBody(model.activeNote!.id, body)}
 						onCommentsChange={(body, comments) =>
@@ -330,6 +355,12 @@
 		background: rgb(251 248 242 / 96%);
 		border-top: 1px solid var(--line);
 		font-size: 0.7rem;
+	}
+
+	main.distraction-free .item-header,
+	main.distraction-free .note-summary,
+	main.distraction-free .status-bar {
+		display: none;
 	}
 
 	.save-state {

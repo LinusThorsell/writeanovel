@@ -10,6 +10,7 @@
 		Settings,
 		UserRound
 	} from '@lucide/svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import InstallApplicationButton from '$lib/components/application/InstallApplicationButton.svelte';
 	import BookSettingsModal from '$lib/components/settings/BookSettingsModal.svelte';
@@ -19,14 +20,63 @@
 	let { model }: { model: WriteANovelState } = $props();
 	let sidebarOpen = $state(false);
 	let exportOpen = $state(false);
+	let distractionFree = $state(false);
+	let workspaceElement: HTMLDivElement | undefined;
+
+	const captureWorkspace: Attachment<HTMLDivElement> = (element) => {
+		workspaceElement = element;
+		return () => {
+			if (workspaceElement === element) workspaceElement = undefined;
+		};
+	};
 
 	async function exportBook(format: 'pdf' | 'epub'): Promise<void> {
 		exportOpen = false;
 		await model.export(format);
 	}
+
+	async function toggleDistractionFree(): Promise<void> {
+		const entering = !distractionFree;
+		distractionFree = entering;
+		sidebarOpen = false;
+		exportOpen = false;
+
+		if (entering) {
+			if (!document.fullscreenElement && workspaceElement?.requestFullscreen) {
+				try {
+					await workspaceElement.requestFullscreen();
+				} catch {
+					// CSS focus mode remains available where the Fullscreen API is restricted.
+				}
+			}
+		} else if (document.fullscreenElement === workspaceElement) {
+			try {
+				await document.exitFullscreen();
+			} catch {
+				// The layout can still leave focus mode if the browser owns fullscreen state.
+			}
+		}
+	}
+
+	function handleFullscreenChange(): void {
+		if (distractionFree && !document.fullscreenElement) distractionFree = false;
+	}
+
+	function handleKeydown(event: KeyboardEvent): void {
+		if (event.key !== 'Escape' || !distractionFree) return;
+		if (document.querySelector(':popover-open')) return;
+		distractionFree = false;
+		if (document.fullscreenElement === workspaceElement) {
+			document.exitFullscreen().catch(() => {
+				// The browser may already be completing its own Escape handling.
+			});
+		}
+	}
 </script>
 
-<div class="workspace-page">
+<svelte:document onfullscreenchange={handleFullscreenChange} onkeydown={handleKeydown} />
+
+<div class="workspace-page" class:distraction-free={distractionFree} {@attach captureWorkspace}>
 	<header class="topbar">
 		<div class="topbar-left">
 			<button
@@ -105,7 +155,7 @@
 				<WorkspaceSidebar {model} />
 			</div>
 		</div>
-		<EditorPane {model} />
+		<EditorPane {model} {distractionFree} onToggleDistractionFree={toggleDistractionFree} />
 	</div>
 </div>
 
@@ -285,6 +335,22 @@
 		grid-template-columns: 17.5rem minmax(0, 1fr);
 		padding-bottom: env(safe-area-inset-bottom);
 		overflow: hidden;
+	}
+
+	.workspace-page.distraction-free {
+		--topbar-height: 0px;
+	}
+
+	.workspace-page.distraction-free .topbar,
+	.workspace-page.distraction-free .sidebar {
+		display: none;
+	}
+
+	.workspace-page.distraction-free .workspace-grid {
+		height: 100vh;
+		height: 100dvh;
+		grid-template-columns: minmax(0, 1fr);
+		padding-bottom: 0;
 	}
 
 	.sidebar,
