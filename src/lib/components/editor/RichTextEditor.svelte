@@ -4,16 +4,22 @@
 		AlignLeft,
 		AlignRight,
 		Bold,
+		CornerDownRight,
 		ImagePlus,
 		Italic,
 		Link,
 		List,
 		ListOrdered,
+		MessageSquarePlus,
+		MessagesSquare,
 		Quote,
 		Redo2,
+		Send,
 		Strikethrough,
+		Trash2,
 		Underline,
-		Undo2
+		Undo2,
+		X
 	} from '@lucide/svelte';
 	import { Editor } from '@tiptap/core';
 	import { untrack } from 'svelte';
@@ -24,7 +30,13 @@
 		hydrateAssetSources,
 		removeTransientAssetSources
 	} from '$lib/application/media-service';
-	import type { RichTextNode, TrimSize, TypographyPreset } from '$lib/domain/types';
+	import type { CommentThread, RichTextNode, TrimSize, TypographyPreset } from '$lib/domain/types';
+	import {
+		commentAnchorSnapshots,
+		formatCommentQuote,
+		REMOVE_COMMENT_ANCHOR_META,
+		type CommentAnchorSnapshot
+	} from '$lib/editor/comment-anchor';
 	import { editorExtensions } from '$lib/editor/extensions';
 	import { calculateEditorPageLayout } from '$lib/editor/page-layout';
 	import {
@@ -35,24 +47,30 @@
 
 	type Props = {
 		body: RichTextNode;
+		comments: CommentThread[];
+		commentAuthor: string;
 		assetUrls: ReadonlyMap<string, string>;
 		typography: TypographyPreset;
 		trimSize: TrimSize;
 		typesetHeading?: TypesetDocumentHeading;
 		placeholder?: string;
 		onChange: (body: RichTextNode) => void;
+		onCommentsChange: (body: RichTextNode, comments: CommentThread[]) => void;
 		onAddMedia: (file: File) => Promise<MediaInsertion>;
 		onError: (message: string) => void;
 	};
 
 	let {
 		body,
+		comments,
+		commentAuthor,
 		assetUrls,
 		typography,
 		trimSize,
 		typesetHeading,
 		placeholder = 'Begin writing…',
 		onChange,
+		onCommentsChange,
 		onAddMedia,
 		onError
 	}: Props = $props();
@@ -64,7 +82,15 @@
 	let pageMarginBlock = $state(88);
 	let documentHeadingHeight = $state(0);
 	let mediaInput = $state<HTMLInputElement>();
+	let paperElement: HTMLElement | undefined;
+	let selectionCommentPosition = $state.raw<{ top: number; left: number }>();
+	let commentPanelOpen = $state(false);
+	let activeThreadId = $state<string>();
+	let pendingComment = $state.raw<{ from: number; to: number; quotedText: string }>();
+	let newCommentText = $state('');
+	let replyText = $state('');
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
+	let skipNextSave = false;
 	const typographyStyle = $derived(bookTypographyStyle(typography));
 	const documentHeadingTop = $derived(pageHeight * BOOK_LAYOUT.documentHeadingTopRatio);
 	const documentHeadingGap = $derived(
@@ -78,6 +104,12 @@
 				)
 			: 0
 	);
+	const liveCommentAnchors = $derived.by(() => {
+		revision;
+		return editor
+			? commentAnchorSnapshots(editor.state.doc)
+			: new Map<string, CommentAnchorSnapshot>();
+	});
 
 	function updatePaperLayout(element: HTMLElement): void {
 		if (element.clientWidth <= 0) return;
@@ -88,12 +120,17 @@
 	}
 
 	const observePaper: Attachment<HTMLElement> = (element) => {
+		paperElement = element;
 		updatePaperLayout(element);
-		const resizeObserver = new ResizeObserver(() => updatePaperLayout(element));
+		const resizeObserver = new ResizeObserver(() => {
+			updatePaperLayout(element);
+			updateSelectionCommentButton();
+		});
 		resizeObserver.observe(element);
 
 		return () => {
 			resizeObserver.disconnect();
+			if (paperElement === element) paperElement = undefined;
 		};
 	};
 
@@ -128,15 +165,48 @@
 					class: 'writing-surface',
 					spellcheck: 'true',
 					'aria-label': 'Manuscript editor'
+				},
+				handleClick: (_view, _position, event) => {
+					if (!(event.target instanceof Element)) return false;
+					const anchor = event.target.closest<HTMLElement>('[data-comment-thread-id]');
+					const threadId = anchor?.dataset.commentThreadId;
+					if (!threadId || !comments.some((thread) => thread.id === threadId)) return false;
+					activeThreadId = threadId;
+					replyText = '';
+					commentPanelOpen = true;
+					return false;
 				}
 			},
-			onTransaction: () => {
+			onTransaction: ({ transaction }) => {
+				if (pendingComment && transaction.docChanged) {
+					pendingComment = {
+						...pendingComment,
+						from: transaction.mapping.map(pendingComment.from, 1),
+						to: transaction.mapping.map(pendingComment.to, -1)
+					};
+				}
 				revision += 1;
 			},
+			onSelectionUpdate: ({ editor: selectedEditor }) => {
+				updateSelectionCommentButton(selectedEditor);
+			},
+			onBlur: () => {
+				selectionCommentPosition = undefined;
+			},
 			onUpdate: ({ editor: updatedEditor }) => {
+				if (skipNextSave) {
+					skipNextSave = false;
+					return;
+				}
 				if (saveTimer) clearTimeout(saveTimer);
 				saveTimer = setTimeout(() => {
-					onChange(removeTransientAssetSources(updatedEditor.getJSON()));
+					const updatedBody = removeTransientAssetSources(updatedEditor.getJSON());
+					const updatedComments = commentsWithCurrentQuotes(updatedEditor);
+					if (updatedComments === comments) {
+						onChange(updatedBody);
+					} else {
+						onCommentsChange(updatedBody, updatedComments);
+					}
 				}, 350);
 			}
 		});
@@ -216,6 +286,252 @@
 
 	function alignImage(alignment: 'left' | 'center' | 'right'): void {
 		editor?.chain().focus().updateAttributes('image', { alignment }).run();
+	}
+
+	function hasTextSelection(): boolean {
+		revision;
+		if (!editor) return false;
+		const { empty, from, to } = editor.state.selection;
+		return !empty && Boolean(editor.state.doc.textBetween(from, to, ' ').trim());
+	}
+
+	function updateSelectionCommentButton(currentEditor: Editor | undefined = editor): void {
+		if (!currentEditor || !paperElement || pendingComment) {
+			selectionCommentPosition = undefined;
+			return;
+		}
+		const { empty, from, to } = currentEditor.state.selection;
+		if (empty || !currentEditor.state.doc.textBetween(from, to, ' ').trim()) {
+			selectionCommentPosition = undefined;
+			return;
+		}
+
+		const start = currentEditor.view.coordsAtPos(from);
+		const end = currentEditor.view.coordsAtPos(to);
+		const paperBounds = paperElement.getBoundingClientRect();
+		const preferredTop = Math.min(start.top, end.top) - paperBounds.top - 42;
+		selectionCommentPosition = {
+			top:
+				preferredTop >= 8 ? preferredTop : Math.max(start.bottom, end.bottom) - paperBounds.top + 8,
+			left: Math.min(Math.max(end.right - paperBounds.left, 58), paperBounds.width - 58)
+		};
+	}
+
+	function startComment(): void {
+		if (!editor) return;
+		const { empty, from, to } = editor.state.selection;
+		const selectedText = editor.state.doc.textBetween(from, to, ' ').replace(/\s+/g, ' ').trim();
+		if (empty || !selectedText) {
+			onError('Select some text before adding a comment.');
+			return;
+		}
+
+		pendingComment = {
+			from,
+			to,
+			quotedText: formatCommentQuote(selectedText)
+		};
+		newCommentText = '';
+		selectionCommentPosition = undefined;
+		activeThreadId = undefined;
+		commentPanelOpen = true;
+	}
+
+	function cancelComment(): void {
+		pendingComment = undefined;
+		newCommentText = '';
+		updateSelectionCommentButton();
+	}
+
+	function submitComment(event: SubmitEvent): void {
+		event.preventDefault();
+		if (!editor || !pendingComment) return;
+		const messageBody = newCommentText.trim();
+		if (!messageBody) return;
+
+		const draft = pendingComment;
+		const docEnd = editor.state.doc.content.size;
+		const from = Math.max(1, Math.min(draft.from, docEnd));
+		const to = Math.max(from, Math.min(draft.to, docEnd));
+		if (from === to || !editor.state.doc.textBetween(from, to, ' ').trim()) {
+			onError('That text is no longer available. Select it again to add the comment.');
+			cancelComment();
+			return;
+		}
+
+		const timestamp = new Date().toISOString();
+		const threadId = crypto.randomUUID();
+		const thread: CommentThread = {
+			id: threadId,
+			quotedText: draft.quotedText,
+			messages: [
+				{
+					id: crypto.randomUUID(),
+					authorName: commentAuthor,
+					body: messageBody,
+					createdAt: timestamp
+				}
+			],
+			createdAt: timestamp,
+			updatedAt: timestamp
+		};
+
+		pendingComment = undefined;
+		newCommentText = '';
+		activeThreadId = threadId;
+		skipNextSave = true;
+		editor
+			.chain()
+			.focus()
+			.setTextSelection({ from, to })
+			.setMark('commentAnchor', { threadId })
+			.setTextSelection(to)
+			.run();
+		onCommentsChange(removeTransientAssetSources(editor.getJSON()), [...comments, thread]);
+	}
+
+	function submitReply(event: SubmitEvent, threadId: string): void {
+		event.preventDefault();
+		if (!editor) return;
+		const messageBody = replyText.trim();
+		if (!messageBody) return;
+		const timestamp = new Date().toISOString();
+		const updatedComments = comments.map((thread) =>
+			thread.id === threadId
+				? {
+						...thread,
+						messages: [
+							...thread.messages,
+							{
+								id: crypto.randomUUID(),
+								authorName: commentAuthor,
+								body: messageBody,
+								createdAt: timestamp
+							}
+						],
+						updatedAt: timestamp
+					}
+				: thread
+		);
+		replyText = '';
+		onCommentsChange(removeTransientAssetSources(editor.getJSON()), updatedComments);
+	}
+
+	function removeThread(threadId: string): void {
+		if (!editor) return;
+		if (saveTimer) {
+			clearTimeout(saveTimer);
+			saveTimer = undefined;
+		}
+
+		const range = threadRange(threadId);
+		const commentAnchor = editor.schema.marks.commentAnchor;
+		if (range && commentAnchor) {
+			skipNextSave = true;
+			const transaction = editor.state.tr
+				.removeMark(range.from, range.to, commentAnchor)
+				.setMeta(REMOVE_COMMENT_ANCHOR_META, threadId);
+			editor.view.dispatch(transaction);
+		}
+
+		if (activeThreadId === threadId) activeThreadId = undefined;
+		replyText = '';
+		onCommentsChange(
+			removeTransientAssetSources(editor.getJSON()),
+			comments.filter((thread) => thread.id !== threadId)
+		);
+	}
+
+	function deleteThread(thread: CommentThread): void {
+		const messageCount = thread.messages.length;
+		const confirmed = window.confirm(
+			`Delete this entire comment thread? The manuscript text will stay, but the highlight and ${messageCount} ${messageCount === 1 ? 'comment' : 'comments'} will be removed.`
+		);
+		if (confirmed) removeThread(thread.id);
+	}
+
+	function deleteMessage(thread: CommentThread, messageId: string): void {
+		const onlyMessage = thread.messages.length === 1;
+		const confirmed = window.confirm(
+			onlyMessage
+				? 'Delete this comment? It is the only comment in the thread, so the highlight and thread will also be removed.'
+				: 'Delete this comment? This cannot be undone.'
+		);
+		if (!confirmed || !editor) return;
+		if (onlyMessage) {
+			removeThread(thread.id);
+			return;
+		}
+
+		if (saveTimer) {
+			clearTimeout(saveTimer);
+			saveTimer = undefined;
+		}
+		const timestamp = new Date().toISOString();
+		const updatedComments = comments.map((candidate) =>
+			candidate.id === thread.id
+				? {
+						...candidate,
+						messages: candidate.messages.filter((message) => message.id !== messageId),
+						updatedAt: timestamp
+					}
+				: candidate
+		);
+		onCommentsChange(removeTransientAssetSources(editor.getJSON()), updatedComments);
+	}
+
+	function commentDeleteLabel(body: string): string {
+		const normalized = body.replace(/\s+/g, ' ').trim();
+		const excerpt = normalized.length > 72 ? `${normalized.slice(0, 69)}…` : normalized;
+		return `Delete comment: ${excerpt}`;
+	}
+
+	function commentsWithCurrentQuotes(currentEditor: Editor): CommentThread[] {
+		const anchors = commentAnchorSnapshots(currentEditor.state.doc);
+		let changed = false;
+		const updatedComments = comments.map((thread) => {
+			const quotedText = anchors.get(thread.id)?.quotedText;
+			if (!quotedText || quotedText === thread.quotedText) return thread;
+			changed = true;
+			return { ...thread, quotedText };
+		});
+		return changed ? updatedComments : comments;
+	}
+
+	function threadRange(threadId: string): { from: number; to: number } | undefined {
+		const anchor = liveCommentAnchors.get(threadId);
+		return anchor ? { from: anchor.from, to: anchor.to } : undefined;
+	}
+
+	function threadQuote(thread: CommentThread): string {
+		return liveCommentAnchors.get(thread.id)?.quotedText || thread.quotedText;
+	}
+
+	function goToThread(threadId: string): void {
+		activeThreadId = threadId;
+		replyText = '';
+		commentPanelOpen = true;
+		const range = threadRange(threadId);
+		if (range) editor?.chain().focus().setTextSelection(range).scrollIntoView().run();
+	}
+
+	function formatCommentDate(value: string): string {
+		const date = new Date(value);
+		const months = [
+			'Jan',
+			'Feb',
+			'Mar',
+			'Apr',
+			'May',
+			'Jun',
+			'Jul',
+			'Aug',
+			'Sep',
+			'Oct',
+			'Nov',
+			'Dec'
+		];
+		return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 	}
 </script>
 
@@ -304,6 +620,24 @@
 			accept={MEDIA_ACCEPT_ATTRIBUTE}
 			onchange={insertMedia}
 		/>
+		<span class="divider"></span>
+		<button
+			type="button"
+			aria-label="Add comment to selected text"
+			title={hasTextSelection() ? 'Add comment' : 'Select text to comment on'}
+			disabled={!hasTextSelection()}
+			onclick={startComment}><MessageSquarePlus size={18} /></button
+		>
+		<button
+			type="button"
+			class:active={commentPanelOpen}
+			aria-label={`Show comments (${comments.length})`}
+			aria-pressed={commentPanelOpen}
+			onclick={() => (commentPanelOpen = !commentPanelOpen)}
+		>
+			<MessagesSquare size={18} />
+			{#if comments.length > 0}<span class="comment-count">{comments.length}</span>{/if}
+		</button>
 		<span class="toolbar-spacer"></span>
 		<button type="button" aria-label="Undo" onclick={() => editor?.chain().focus().undo().run()}
 			><Undo2 size={18} /></button
@@ -329,48 +663,177 @@
 		</div>
 	{/if}
 
-	<div
-		class="paper"
-		{@attach observePaper}
-		style:--page-height={`${pageHeight}px`}
-		style:--page-margin-inline={`${pageMarginInline}px`}
-		style:--page-margin-block={`${pageMarginBlock}px`}
-		style:--body-font-family={typographyStyle.editorFontFamily}
-		style:--body-font-size={`${typographyStyle.editorBodyFontSizeRem}rem`}
-		style:--body-line-height={String(typographyStyle.lineHeight)}
-		style:--document-heading-top={`${documentHeadingTop}px`}
-		style:--document-heading-space={`${documentHeadingSpace}px`}
-		style:--document-title-scale={String(typographyStyle.documentTitleScale)}
-		style:--document-label-scale={String(typographyStyle.documentLabelScale)}
-		style:--document-title-letter-spacing={`${BOOK_LAYOUT.documentTitleLetterSpacingEm}em`}
-		style:--document-label-letter-spacing={`${BOOK_LAYOUT.documentLabelLetterSpacingEm}em`}
-		style:--document-label-gap={`${BOOK_LAYOUT.documentLabelGapEm}em`}
-		style:--heading-one-scale={String(typographyStyle.headingOneScale)}
-		style:--heading-two-scale={String(typographyStyle.headingTwoScale)}
-		style:--heading-three-scale={String(typographyStyle.headingThreeScale)}
-		style:--heading-line-height={String(BOOK_LAYOUT.headingLineHeight)}
-		style:--paragraph-gap={`${BOOK_LAYOUT.paragraphGapEm}em`}
-		style:--paragraph-indent={`${BOOK_LAYOUT.paragraphIndentEm}em`}
-		style:--heading-margin-top={`${BOOK_LAYOUT.headingMarginTopEm}em`}
-		style:--heading-margin-bottom={`${BOOK_LAYOUT.headingMarginBottomEm}em`}
-		style:--blockquote-margin-block={`${BOOK_LAYOUT.blockquoteMarginBlockEm}em`}
-		style:--blockquote-margin-inline={`${BOOK_LAYOUT.blockquoteMarginInlineEm}em`}
-		style:--media-margin-block={`${BOOK_LAYOUT.mediaMarginBlockEm}em`}
-	>
-		{#if typesetHeading?.label || typesetHeading?.title}
+	<div class="editor-layout" class:comments-open={commentPanelOpen}>
+		<div class="writing-column">
 			<div
-				class="typeset-document-heading"
-				class:chapter-heading={typesetHeading.kind === 'chapter'}
-				aria-label="Typeset page heading"
-				{@attach observeDocumentHeading}
+				class="paper"
+				{@attach observePaper}
+				style:--page-height={`${pageHeight}px`}
+				style:--page-margin-inline={`${pageMarginInline}px`}
+				style:--page-margin-block={`${pageMarginBlock}px`}
+				style:--body-font-family={typographyStyle.editorFontFamily}
+				style:--body-font-size={`${typographyStyle.editorBodyFontSizeRem}rem`}
+				style:--body-line-height={String(typographyStyle.lineHeight)}
+				style:--document-heading-top={`${documentHeadingTop}px`}
+				style:--document-heading-space={`${documentHeadingSpace}px`}
+				style:--document-title-scale={String(typographyStyle.documentTitleScale)}
+				style:--document-label-scale={String(typographyStyle.documentLabelScale)}
+				style:--document-title-letter-spacing={`${BOOK_LAYOUT.documentTitleLetterSpacingEm}em`}
+				style:--document-label-letter-spacing={`${BOOK_LAYOUT.documentLabelLetterSpacingEm}em`}
+				style:--document-label-gap={`${BOOK_LAYOUT.documentLabelGapEm}em`}
+				style:--heading-one-scale={String(typographyStyle.headingOneScale)}
+				style:--heading-two-scale={String(typographyStyle.headingTwoScale)}
+				style:--heading-three-scale={String(typographyStyle.headingThreeScale)}
+				style:--heading-line-height={String(BOOK_LAYOUT.headingLineHeight)}
+				style:--paragraph-gap={`${BOOK_LAYOUT.paragraphGapEm}em`}
+				style:--paragraph-indent={`${BOOK_LAYOUT.paragraphIndentEm}em`}
+				style:--heading-margin-top={`${BOOK_LAYOUT.headingMarginTopEm}em`}
+				style:--heading-margin-bottom={`${BOOK_LAYOUT.headingMarginBottomEm}em`}
+				style:--blockquote-margin-block={`${BOOK_LAYOUT.blockquoteMarginBlockEm}em`}
+				style:--blockquote-margin-inline={`${BOOK_LAYOUT.blockquoteMarginInlineEm}em`}
+				style:--media-margin-block={`${BOOK_LAYOUT.mediaMarginBlockEm}em`}
 			>
-				{#if typesetHeading.label}
-					<p>{typesetHeading.label}</p>
+				{#if typesetHeading?.label || typesetHeading?.title}
+					<div
+						class="typeset-document-heading"
+						class:chapter-heading={typesetHeading.kind === 'chapter'}
+						aria-label="Typeset page heading"
+						{@attach observeDocumentHeading}
+					>
+						{#if typesetHeading.label}
+							<p>{typesetHeading.label}</p>
+						{/if}
+						{#if typesetHeading.title}<h1>{typesetHeading.title}</h1>{/if}
+					</div>
 				{/if}
-				{#if typesetHeading.title}<h1>{typesetHeading.title}</h1>{/if}
+				<div class="editor-mount" {@attach mountEditor}></div>
+				{#if selectionCommentPosition && !pendingComment}
+					<button
+						type="button"
+						class="selection-comment-button"
+						aria-label="Comment on selected text"
+						style:top={`${selectionCommentPosition.top}px`}
+						style:left={`${selectionCommentPosition.left}px`}
+						onpointerdown={(event) => event.preventDefault()}
+						onclick={startComment}
+					>
+						<MessageSquarePlus size={15} /> Comment
+					</button>
+				{/if}
 			</div>
+		</div>
+
+		{#if commentPanelOpen}
+			<aside class="comments-panel" aria-label="Comments panel">
+				<header class="comments-header">
+					<div>
+						<p class="comments-eyebrow">Discussion</p>
+						<h2>Comments <span>{comments.length}</span></h2>
+					</div>
+					<button
+						type="button"
+						aria-label="Close comments"
+						onclick={() => (commentPanelOpen = false)}><X size={18} /></button
+					>
+				</header>
+
+				{#if pendingComment}
+					<form class="new-comment" onsubmit={submitComment}>
+						<p class="anchor-quote">“{pendingComment.quotedText}”</p>
+						<label for="new-comment">Add a comment</label>
+						<textarea
+							id="new-comment"
+							rows="3"
+							maxlength="2000"
+							placeholder="What do you want to remember or discuss?"
+							bind:value={newCommentText}></textarea>
+						<div class="comment-form-actions">
+							<button type="button" class="secondary-button" onclick={cancelComment}>Cancel</button>
+							<button type="submit" class="primary-button" disabled={!newCommentText.trim()}
+								><MessageSquarePlus size={15} /> Comment</button
+							>
+						</div>
+					</form>
+				{/if}
+
+				{#if comments.length === 0 && !pendingComment}
+					<div class="comments-empty">
+						<MessagesSquare size={24} />
+						<p>No comments yet.</p>
+						<small>Select text in the manuscript, then use the comment button.</small>
+					</div>
+				{:else}
+					<div class="comment-list">
+						{#each comments as thread (thread.id)}
+							<article class="comment-thread" class:active={activeThreadId === thread.id}>
+								<div class="thread-anchor-row">
+									<button
+										type="button"
+										class="thread-anchor"
+										aria-label={`Go to comment on: ${threadQuote(thread)}`}
+										onclick={() => goToThread(thread.id)}
+									>
+										<span>“{threadQuote(thread)}”</span>
+										{#if threadRange(thread.id)}
+											<CornerDownRight size={14} />
+										{:else}
+											<small>Original text removed</small>
+										{/if}
+									</button>
+									<button
+										type="button"
+										class="delete-thread-button"
+										aria-label={`Delete entire thread on: ${threadQuote(thread)}`}
+										title="Delete entire thread"
+										onclick={() => deleteThread(thread)}
+									>
+										<Trash2 size={14} />
+									</button>
+								</div>
+								<div class="thread-messages">
+									{#each thread.messages as message (message.id)}
+										<div class="comment-message">
+											<p class="message-meta">
+												<strong>{message.authorName}</strong>
+												<span class="message-actions">
+													<span>{formatCommentDate(message.createdAt)}</span>
+													<button
+														type="button"
+														class="delete-comment-button"
+														aria-label={commentDeleteLabel(message.body)}
+														title="Delete this comment"
+														onclick={() => deleteMessage(thread, message.id)}
+													>
+														<Trash2 size={12} />
+													</button>
+												</span>
+											</p>
+											<p>{message.body}</p>
+										</div>
+									{/each}
+								</div>
+								{#if activeThreadId === thread.id}
+									<form class="reply-form" onsubmit={(event) => submitReply(event, thread.id)}>
+										<label for={`reply-${thread.id}`}>Reply</label>
+										<div>
+											<textarea
+												id={`reply-${thread.id}`}
+												rows="2"
+												maxlength="2000"
+												placeholder="Add to this thread…"
+												bind:value={replyText}></textarea>
+											<button type="submit" aria-label="Send reply" disabled={!replyText.trim()}
+												><Send size={16} /></button
+											>
+										</div>
+									</form>
+								{/if}
+							</article>
+						{/each}
+					</div>
+				{/if}
+			</aside>
 		{/if}
-		<div class="editor-mount" {@attach mountEditor}></div>
 	</div>
 </div>
 
@@ -400,6 +863,7 @@
 
 	.toolbar button,
 	.image-toolbar button {
+		position: relative;
 		display: grid;
 		flex: 0 0 auto;
 		width: 2.15rem;
@@ -417,6 +881,31 @@
 	.image-toolbar button:hover {
 		color: var(--forest-deep);
 		background: rgb(39 72 59 / 11%);
+	}
+
+	.toolbar button:disabled,
+	.image-toolbar button:disabled {
+		color: #a9ada9;
+		background: transparent;
+		cursor: not-allowed;
+		opacity: 0.55;
+	}
+
+	.comment-count {
+		position: absolute;
+		top: 0.05rem;
+		right: 0.05rem;
+		display: grid;
+		min-width: 0.9rem;
+		height: 0.9rem;
+		place-items: center;
+		padding: 0 0.18rem;
+		color: white;
+		background: var(--forest);
+		border-radius: 999px;
+		font-size: 0.55rem;
+		font-weight: 800;
+		line-height: 1;
 	}
 
 	.block-select {
@@ -459,6 +948,21 @@
 
 	.image-toolbar small {
 		margin-left: 0.5rem;
+	}
+
+	.editor-layout {
+		display: grid;
+		min-width: 0;
+		align-items: start;
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.editor-layout.comments-open {
+		grid-template-columns: minmax(0, 1fr) minmax(18rem, 20rem);
+	}
+
+	.writing-column {
+		min-width: 0;
 	}
 
 	.paper {
@@ -563,6 +1067,44 @@
 		font-style: italic;
 	}
 
+	.editor-mount :global(.writing-surface .comment-anchor) {
+		padding: 0.05em 0;
+		color: inherit;
+		background: linear-gradient(to bottom, transparent 38%, rgb(239 194 68 / 46%) 38%);
+		border-radius: 0.12em;
+		box-decoration-break: clone;
+		cursor: pointer;
+		-webkit-box-decoration-break: clone;
+	}
+
+	.editor-mount :global(.writing-surface .comment-anchor:hover) {
+		background-color: rgb(239 194 68 / 24%);
+	}
+
+	.selection-comment-button {
+		position: absolute;
+		z-index: 8;
+		display: inline-flex;
+		min-height: 2.1rem;
+		align-items: center;
+		gap: 0.38rem;
+		padding: 0.4rem 0.7rem;
+		color: white;
+		background: var(--forest-deep);
+		border: 1px solid rgb(255 255 255 / 24%);
+		border-radius: 0.5rem;
+		box-shadow: 0 7px 20px rgb(26 39 33 / 28%);
+		font-size: 0.72rem;
+		font-weight: 780;
+		line-height: 1;
+		transform: translateX(-50%);
+	}
+
+	.selection-comment-button:hover {
+		background: var(--forest);
+		transform: translateX(-50%) translateY(-1px);
+	}
+
 	.editor-mount :global(.writing-surface img) {
 		display: block;
 		max-width: 100%;
@@ -634,6 +1176,370 @@
 		content: attr(data-placeholder);
 	}
 
+	.comments-panel {
+		position: sticky;
+		z-index: 4;
+		top: 3.7rem;
+		display: flex;
+		max-height: calc(100vh - 11rem);
+		min-height: 14rem;
+		margin: 1rem 1rem 2rem 0;
+		flex-direction: column;
+		overflow: hidden;
+		background: #fbf8f2;
+		border: 1px solid #d8d1c6;
+		border-radius: 0.85rem;
+		box-shadow: 0 12px 30px rgb(47 48 43 / 12%);
+	}
+
+	.comments-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.9rem 1rem;
+		background: #f5f0e7;
+		border-bottom: 1px solid #ddd5ca;
+	}
+
+	.comments-header h2,
+	.comments-header p {
+		margin: 0;
+	}
+
+	.comments-header h2 {
+		color: var(--ink);
+		font-size: 1rem;
+	}
+
+	.comments-header h2 span {
+		color: var(--ink-soft);
+		font-size: 0.72rem;
+		font-weight: 700;
+	}
+
+	.comments-eyebrow {
+		margin-bottom: 0.1rem !important;
+		color: #8b6b1f;
+		font-size: 0.62rem;
+		font-weight: 800;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+	}
+
+	.comments-header button {
+		display: grid;
+		width: 2rem;
+		height: 2rem;
+		place-items: center;
+		padding: 0;
+		color: var(--ink-soft);
+		background: transparent;
+		border: 0;
+		border-radius: 0.4rem;
+	}
+
+	.comments-header button:hover {
+		color: var(--ink);
+		background: rgb(39 72 59 / 8%);
+	}
+
+	.new-comment {
+		padding: 0.9rem;
+		background: #fffdf8;
+		border-bottom: 1px solid #ddd5ca;
+	}
+
+	.anchor-quote,
+	.thread-anchor span {
+		display: -webkit-box;
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+	}
+
+	.anchor-quote {
+		margin: 0 0 0.8rem;
+		padding-left: 0.65rem;
+		color: #6c5a2a;
+		border-left: 3px solid #e0b942;
+		font-family: 'Libre Baskerville', serif;
+		font-size: 0.78rem;
+		font-style: italic;
+		line-height: 1.5;
+	}
+
+	.new-comment label,
+	.reply-form label {
+		display: block;
+		margin-bottom: 0.3rem;
+		color: var(--ink-soft);
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.new-comment textarea,
+	.reply-form textarea {
+		box-sizing: border-box;
+		width: 100%;
+		padding: 0.55rem 0.65rem;
+		resize: vertical;
+		color: var(--ink);
+		background: white;
+		border: 1px solid #cec6ba;
+		border-radius: 0.5rem;
+		font: inherit;
+		font-size: 0.8rem;
+		line-height: 1.45;
+	}
+
+	.new-comment textarea:focus,
+	.reply-form textarea:focus {
+		border-color: var(--forest);
+		outline: 2px solid rgb(39 72 59 / 12%);
+	}
+
+	.comment-form-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.45rem;
+		margin-top: 0.55rem;
+	}
+
+	.comment-form-actions button {
+		display: inline-flex;
+		min-height: 2rem;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.38rem 0.65rem;
+		border-radius: 0.45rem;
+		font-size: 0.72rem;
+		font-weight: 750;
+	}
+
+	.secondary-button {
+		color: var(--ink-soft);
+		background: transparent;
+		border: 1px solid #d4ccc0;
+	}
+
+	.primary-button {
+		color: white;
+		background: var(--forest);
+		border: 1px solid var(--forest);
+	}
+
+	.primary-button:disabled,
+	.reply-form button:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
+	.comments-empty {
+		display: grid;
+		place-items: center;
+		padding: 2.8rem 1.4rem;
+		color: #8a8f8a;
+		text-align: center;
+	}
+
+	.comments-empty p {
+		margin: 0.65rem 0 0.2rem;
+		color: var(--ink);
+		font-weight: 750;
+	}
+
+	.comments-empty small {
+		max-width: 15rem;
+		line-height: 1.45;
+	}
+
+	.comment-list {
+		min-height: 0;
+		padding: 0.75rem;
+		overflow-y: auto;
+	}
+
+	.comment-thread {
+		margin-bottom: 0.65rem;
+		overflow: hidden;
+		background: white;
+		border: 1px solid #ddd6ca;
+		border-radius: 0.65rem;
+		transition:
+			border-color 120ms ease,
+			box-shadow 120ms ease;
+	}
+
+	.comment-thread.active {
+		border-color: #c7a13a;
+		box-shadow: 0 0 0 2px rgb(224 185 66 / 15%);
+	}
+
+	.thread-anchor {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		padding: 0.58rem 0.7rem;
+		color: #695827;
+		background: transparent;
+		border: 0;
+		font-family: 'Libre Baskerville', serif;
+		font-size: 0.69rem;
+		font-style: italic;
+		line-height: 1.4;
+		text-align: left;
+	}
+
+	.thread-anchor-row {
+		display: flex;
+		align-items: stretch;
+		background: #faf5e7;
+		border-bottom: 1px solid #e6ddc8;
+	}
+
+	.delete-thread-button {
+		display: grid;
+		flex: 0 0 2.35rem;
+		place-items: center;
+		padding: 0;
+		color: #8a7660;
+		background: transparent;
+		border: 0;
+		border-left: 1px solid #e6ddc8;
+	}
+
+	.delete-thread-button:hover,
+	.delete-comment-button:hover {
+		color: #a13f35;
+		background: rgb(161 63 53 / 8%);
+	}
+
+	.thread-anchor span {
+		flex: 1;
+	}
+
+	.thread-anchor :global(svg) {
+		flex: 0 0 auto;
+	}
+
+	.thread-anchor small {
+		flex: 0 0 auto;
+		max-width: 4.5rem;
+		color: #9b594f;
+		font-family: 'Manrope', sans-serif;
+		font-size: 0.58rem;
+		font-style: normal;
+		line-height: 1.2;
+		text-align: right;
+	}
+
+	.thread-messages {
+		padding: 0.15rem 0.7rem;
+	}
+
+	.comment-message {
+		padding: 0.65rem 0;
+		border-bottom: 1px solid #eee9e1;
+	}
+
+	.comment-message:last-child {
+		border-bottom: 0;
+	}
+
+	.comment-message p {
+		margin: 0;
+		color: var(--ink);
+		font-size: 0.78rem;
+		line-height: 1.5;
+		white-space: pre-wrap;
+	}
+
+	.comment-message .message-meta {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin-bottom: 0.3rem;
+		color: var(--ink-soft);
+		font-size: 0.63rem;
+	}
+
+	.message-meta strong {
+		color: var(--forest-deep);
+		font-size: 0.7rem;
+	}
+
+	.message-actions {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
+	.delete-comment-button {
+		display: grid;
+		width: 1.65rem;
+		height: 1.65rem;
+		place-items: center;
+		padding: 0;
+		color: #8a7660;
+		background: transparent;
+		border: 0;
+		border-radius: 0.35rem;
+	}
+
+	.reply-form {
+		padding: 0.65rem 0.7rem 0.75rem;
+		background: #faf8f3;
+		border-top: 1px solid #eee9e1;
+	}
+
+	.reply-form > div {
+		display: flex;
+		align-items: end;
+		gap: 0.35rem;
+	}
+
+	.reply-form textarea {
+		min-height: 3.4rem;
+		resize: none;
+	}
+
+	.reply-form button {
+		display: grid;
+		flex: 0 0 auto;
+		width: 2.1rem;
+		height: 2.1rem;
+		place-items: center;
+		padding: 0;
+		color: white;
+		background: var(--forest);
+		border: 0;
+		border-radius: 0.45rem;
+	}
+
+	@media (max-width: 980px) {
+		.editor-layout.comments-open {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.comments-panel {
+			position: fixed;
+			z-index: 20;
+			top: clamp(6.5rem, 14vh, 9rem);
+			right: 0.75rem;
+			bottom: 2.25rem;
+			width: min(22rem, calc(100vw - 1.5rem));
+			max-height: none;
+			margin: 0;
+		}
+	}
+
 	@media (max-width: 760px) {
 		.paper {
 			width: 100%;
@@ -642,6 +1548,16 @@
 
 		.paper {
 			box-shadow: none;
+		}
+
+		.comments-panel {
+			top: 7rem;
+			right: 0;
+			bottom: 2rem;
+			width: 100vw;
+			border-right: 0;
+			border-left: 0;
+			border-radius: 0;
 		}
 	}
 </style>

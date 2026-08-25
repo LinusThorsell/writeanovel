@@ -3,5 +3,11 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	envPrefix: ['VITE_', 'PUBLIC_'],
-	plugins: [sveltekit()]
+	plugins: [sveltekit()],
+	server: {
+		watch: {
+			usePolling: process.env.VITE_USE_POLLING === 'true',
+			interval: 100
+		}
+	}
 });

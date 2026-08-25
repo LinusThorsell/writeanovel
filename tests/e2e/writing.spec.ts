@@ -73,6 +73,107 @@ test('creates, orders, writes, and persists a multi-file novel locally', async (
 	await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 });
 
+test('anchors comment threads to edited manuscript text and persists replies', async ({ page }) => {
+	await createNovel(page, 'Commented Story');
+	const editor = page.locator('.writing-surface');
+	await editor.fill('The harbor bells sounded before dawn.');
+
+	await editor.evaluate((element) => {
+		const text = element.querySelector('p')?.firstChild;
+		if (!text) throw new Error('The manuscript text was not available.');
+		const range = document.createRange();
+		range.setStart(text, 4);
+		range.setEnd(text, 10);
+		const selection = window.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+		element.dispatchEvent(new Event('selectionchange', { bubbles: true }));
+	});
+
+	const addComment = page.getByRole('button', { name: 'Add comment to selected text' });
+	await expect(addComment).toBeEnabled();
+	const selectionComment = page.getByRole('button', { name: 'Comment on selected text' });
+	await expect(selectionComment).toBeVisible();
+	await selectionComment.click();
+	await page.getByLabel('Add a comment').fill('Make this image more ominous.');
+	await page.getByRole('button', { name: 'Comment', exact: true }).click();
+
+	const anchor = page.locator('.comment-anchor');
+	await expect(anchor).toHaveText('harbor');
+	await page.getByLabel('Reply', { exact: true }).fill('Perhaps the bells are warning the town.');
+	await page.getByRole('button', { name: 'Send reply' }).click();
+	await expect(page.getByText('Perhaps the bells are warning the town.')).toBeVisible();
+
+	await editor.focus();
+	await page.keyboard.press('Control+Home');
+	await page.keyboard.type('At dusk, ');
+	await expect(editor).toContainText('At dusk, The harbor bells');
+	await expect(anchor).toHaveText('harbor');
+
+	await anchor.evaluate((element) => {
+		const contentEditable = element.closest<HTMLElement>('[contenteditable="true"]');
+		const text = element.firstChild;
+		if (!contentEditable || !text) throw new Error('The comment anchor was not editable.');
+		contentEditable.focus();
+		const range = document.createRange();
+		range.selectNodeContents(text);
+		const selection = window.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+		document.dispatchEvent(new Event('selectionchange'));
+	});
+	await page.keyboard.type('quay');
+	await expect(anchor).toHaveText('quay');
+	await expect(page.getByRole('button', { name: 'Go to comment on: quay' })).toBeVisible();
+	await page.waitForTimeout(700);
+
+	await page.reload();
+	await expect(editor).toContainText('At dusk, The quay bells');
+	await expect(anchor).toHaveText('quay');
+	await page.getByRole('button', { name: 'Show comments (1)' }).click();
+	await expect(page.getByRole('button', { name: 'Go to comment on: quay' })).toBeVisible();
+	await expect(page.getByText('Make this image more ominous.')).toBeVisible();
+	await expect(page.getByText('Perhaps the bells are warning the town.')).toBeVisible();
+	await expect(page.getByText('Original text removed')).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'Close comments' }).click();
+	await anchor.click();
+	const commentsPanel = page.getByLabel('Comments panel');
+	await expect(commentsPanel).toBeVisible();
+
+	await page.setViewportSize({ width: 390, height: 844 });
+	const mobilePanelFits = await commentsPanel.evaluate((element) => {
+		const bounds = element.getBoundingClientRect();
+		return (
+			bounds.left >= -1 &&
+			bounds.right <= window.innerWidth + 1 &&
+			bounds.top >= 0 &&
+			bounds.bottom <= window.innerHeight + 1 &&
+			document.documentElement.scrollWidth <= document.documentElement.clientWidth
+		);
+	});
+	expect(mobilePanelFits).toBe(true);
+
+	page.once('dialog', (dialog) => dialog.accept());
+	await page
+		.getByRole('button', { name: 'Delete comment: Perhaps the bells are warning the town.' })
+		.click();
+	await expect(page.getByText('Perhaps the bells are warning the town.')).toHaveCount(0);
+	await expect(page.getByText('Make this image more ominous.')).toBeVisible();
+	await page.waitForTimeout(350);
+
+	page.once('dialog', (dialog) => dialog.accept());
+	await page.getByRole('button', { name: 'Delete entire thread on: quay' }).click();
+	await expect(anchor).toHaveCount(0);
+	await expect(editor).toContainText('At dusk, The quay bells');
+	await expect(page.getByText('No comments yet.')).toBeVisible();
+	await page.waitForTimeout(350);
+
+	await page.reload();
+	await expect(editor).toContainText('At dusk, The quay bells');
+	await expect(anchor).toHaveCount(0);
+});
+
 test('keeps a long chapter on one continuous scrollable page and restores the writing position after reload', async ({
 	page
 }) => {

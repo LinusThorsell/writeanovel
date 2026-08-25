@@ -10,6 +10,11 @@ Requirements: Docker with the Compose plugin.
 docker compose up --build
 ```
 
+Compose runs the SvelteKit development server with the repository mounted into the container.
+Changes under `src/` hot-reload in the browser without rebuilding the image. The first start creates
+container-owned volumes for `node_modules` and `.svelte-kit`, so generated files do not overwrite the
+host environment. Re-run with `--build` after changing dependencies or `Dockerfile.dev`.
+
 Open:
 
 - WriteANovel marketing site: <http://localhost:3000>
@@ -84,6 +89,9 @@ Requirements: Node.js 24 and npm.
 npm ci
 npm run dev
 ```
+
+`Dockerfile.dev` and `compose.yaml` provide the equivalent hot-reloading Docker workflow. The main
+`Dockerfile` remains the production image used by GitHub Actions and Kubernetes.
 
 The application source is TypeScript-only. `tsconfig.json` disables JavaScript input and a permanent policy test enforces typed Svelte script blocks and rejects broad escape-hatch types. Two JavaScript files are runtime-required exceptions outside the application source: Svelte's configuration file and PocketBase's migration file.
 

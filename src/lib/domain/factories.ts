@@ -43,6 +43,7 @@ export function createManuscriptDocument(input: {
 		title: input.title,
 		position: input.position,
 		body: structuredClone(EMPTY_DOCUMENT),
+		comments: [],
 		createdAt: timestamp,
 		updatedAt: timestamp
 	};
@@ -61,6 +62,7 @@ export function createStoryNote(input: {
 		title: input.title,
 		summary: '',
 		body: structuredClone(EMPTY_DOCUMENT),
+		comments: [],
 		createdAt: timestamp,
 		updatedAt: timestamp
 	};

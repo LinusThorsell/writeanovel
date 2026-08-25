@@ -141,6 +141,8 @@
 				{#key model.activeDocument.id}
 					<RichTextEditor
 						body={model.activeDocument.body}
+						comments={model.activeDocument.comments ?? []}
+						commentAuthor={model.user?.displayName.trim() || 'You'}
 						assetUrls={model.assetUrls}
 						typography={model.workspace?.project.typography ?? 'literary'}
 						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
@@ -149,6 +151,8 @@
 							? 'Begin this chapter…'
 							: 'Write this page…'}
 						onChange={(body) => model.updateDocumentBody(model.activeDocument!.id, body)}
+						onCommentsChange={(body, comments) =>
+							model.updateDocumentComments(model.activeDocument!.id, body, comments)}
 						onAddMedia={(file) => model.addMedia(file)}
 						onError={(message) => model.showError(message)}
 					/>
@@ -157,11 +161,15 @@
 				{#key model.activeNote.id}
 					<RichTextEditor
 						body={model.activeNote.body}
+						comments={model.activeNote.comments ?? []}
+						commentAuthor={model.user?.displayName.trim() || 'You'}
 						assetUrls={model.assetUrls}
 						typography="modern"
 						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
 						placeholder="Add details, ideas, relationships, and reminders…"
 						onChange={(body) => model.updateNoteBody(model.activeNote!.id, body)}
+						onCommentsChange={(body, comments) =>
+							model.updateNoteComments(model.activeNote!.id, body, comments)}
 						onAddMedia={(file) => model.addMedia(file)}
 						onError={(message) => model.showError(message)}
 					/>

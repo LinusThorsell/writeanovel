@@ -17,6 +17,21 @@ export type RichTextNode = {
 	text?: string;
 };
 
+export type CommentMessage = {
+	id: string;
+	authorName: string;
+	body: string;
+	createdAt: string;
+};
+
+export type CommentThread = {
+	id: string;
+	quotedText: string;
+	messages: CommentMessage[];
+	createdAt: string;
+	updatedAt: string;
+};
+
 export type DocumentKind = 'chapter' | 'front-matter' | 'back-matter';
 export type MatterType =
 	| 'title-page'
@@ -77,6 +92,7 @@ export type ManuscriptDocument = {
 	title: string;
 	position: number;
 	body: RichTextNode;
+	comments?: CommentThread[];
 	chapterHeadingOverride?: ChapterHeadingSettings;
 	createdAt: string;
 	updatedAt: string;
@@ -89,6 +105,7 @@ export type StoryNote = {
 	title: string;
 	summary: string;
 	body: RichTextNode;
+	comments?: CommentThread[];
 	createdAt: string;
 	updatedAt: string;
 };

@@ -10,6 +10,7 @@ import { chapterNumber, documentsOfKind, moveDocument, nextPosition } from '$lib
 import type {
 	AuthenticatedUser,
 	ChapterHeadingSettings,
+	CommentThread,
 	PageNumberingSettings,
 	DocumentKind,
 	ManuscriptDocument,
@@ -247,6 +248,24 @@ export class WriteANovelState {
 		await this.library.saveDocument(updated);
 	}
 
+	async updateDocumentComments(
+		documentId: string,
+		body: RichTextNode,
+		comments: CommentThread[]
+	): Promise<void> {
+		if (!this.workspace) return;
+		const existing = this.workspace.documents.find((document) => document.id === documentId);
+		if (!existing) return;
+		const updated = { ...existing, body, comments, updatedAt: new Date().toISOString() };
+		this.workspace = {
+			...this.workspace,
+			documents: this.workspace.documents.map((document) =>
+				document.id === documentId ? updated : document
+			)
+		};
+		await this.library.saveDocument(updated);
+	}
+
 	async updateChapterHeadingOverride(
 		documentId: string,
 		chapterHeadingOverride: ChapterHeadingSettings | undefined
@@ -277,6 +296,22 @@ export class WriteANovelState {
 		const existing = this.workspace.notes.find((note) => note.id === noteId);
 		if (!existing) return;
 		const updated = { ...existing, body, updatedAt: new Date().toISOString() };
+		this.workspace = {
+			...this.workspace,
+			notes: this.workspace.notes.map((note) => (note.id === noteId ? updated : note))
+		};
+		await this.library.saveNote(updated);
+	}
+
+	async updateNoteComments(
+		noteId: string,
+		body: RichTextNode,
+		comments: CommentThread[]
+	): Promise<void> {
+		if (!this.workspace) return;
+		const existing = this.workspace.notes.find((note) => note.id === noteId);
+		if (!existing) return;
+		const updated = { ...existing, body, comments, updatedAt: new Date().toISOString() };
 		this.workspace = {
 			...this.workspace,
 			notes: this.workspace.notes.map((note) => (note.id === noteId ? updated : note))
