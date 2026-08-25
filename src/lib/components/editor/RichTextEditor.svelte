@@ -92,6 +92,7 @@
 	let pageHeight = $state(1_104);
 	let pageMarginInline = $state(88);
 	let pageMarginBlock = $state(88);
+	let compactPage = $state(false);
 	let documentHeadingHeight = $state(0);
 	let mediaInput = $state<HTMLInputElement>();
 	let paperElement: HTMLElement | undefined;
@@ -104,9 +105,13 @@
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
 	let skipNextSave = false;
 	const typographyStyle = $derived(bookTypographyStyle(typography));
-	const documentHeadingTop = $derived(pageHeight * BOOK_LAYOUT.documentHeadingTopRatio);
+	const documentHeadingTop = $derived(
+		compactPage ? pageMarginBlock + 8 : pageHeight * BOOK_LAYOUT.documentHeadingTopRatio
+	);
 	const documentHeadingGap = $derived(
-		typographyStyle.editorBodyFontSizeRem * 16 * BOOK_LAYOUT.documentHeadingGapEm
+		typographyStyle.editorBodyFontSizeRem *
+			16 *
+			(compactPage ? BOOK_LAYOUT.compactDocumentHeadingGapEm : BOOK_LAYOUT.documentHeadingGapEm)
 	);
 	const documentHeadingSpace = $derived(
 		typesetHeading?.label || typesetHeading?.title
@@ -125,10 +130,15 @@
 
 	function updatePaperLayout(element: HTMLElement): void {
 		if (element.clientWidth <= 0) return;
-		const layout = calculateEditorPageLayout(trimSize, element.clientWidth);
+		const layout = calculateEditorPageLayout(
+			trimSize,
+			element.clientWidth,
+			window.matchMedia('(max-width: 760px)').matches
+		);
 		pageHeight = layout.pageHeight;
 		pageMarginInline = layout.pageMarginInline;
 		pageMarginBlock = layout.pageMarginBlock;
+		compactPage = layout.compact;
 	}
 
 	const observePaper: Attachment<HTMLElement> = (element) => {
@@ -889,6 +899,7 @@
 
 <style>
 	.editor-shell {
+		--focus-topbar-height: calc(3.25rem + var(--safe-area-top, env(safe-area-inset-top)));
 		width: 100%;
 		min-width: 0;
 		min-height: 100%;
@@ -912,7 +923,9 @@
 	}
 
 	.editor-shell.distraction-free .toolbar {
-		top: 3.25rem;
+		top: var(--focus-topbar-height);
+		padding-right: max(0.75rem, var(--safe-area-right, env(safe-area-inset-right)));
+		padding-left: max(0.75rem, var(--safe-area-left, env(safe-area-inset-left)));
 	}
 
 	.focus-topbar {
@@ -920,11 +933,13 @@
 		z-index: 6;
 		top: 0;
 		display: grid;
-		min-height: 3.25rem;
+		min-height: var(--focus-topbar-height);
 		grid-template-columns: minmax(10rem, 1fr) minmax(14rem, 32rem) minmax(10rem, 1fr);
 		align-items: center;
 		gap: 0.75rem;
-		padding: 0.4rem 0.75rem;
+		padding: calc(0.4rem + var(--safe-area-top, env(safe-area-inset-top)))
+			max(0.75rem, var(--safe-area-right, env(safe-area-inset-right))) 0.4rem
+			max(0.75rem, var(--safe-area-left, env(safe-area-inset-left)));
 		background: rgb(251 248 242 / 98%);
 		border-bottom: 1px solid var(--line);
 		backdrop-filter: blur(12px);
@@ -1153,6 +1168,8 @@
 
 	.editor-mount :global(.writing-surface p) {
 		margin: 0 0 var(--paragraph-gap);
+		text-align: justify;
+		text-align-last: left;
 	}
 
 	.editor-mount :global(.writing-surface p + p) {
@@ -1661,9 +1678,10 @@
 
 	@media (max-width: 760px) {
 		.focus-topbar {
-			grid-template-columns: 10rem minmax(7rem, 1fr) auto;
+			grid-template-columns: minmax(3.25rem, 1fr) minmax(8rem, 1.6fr) minmax(3.25rem, 1fr);
 			gap: 0.4rem;
-			padding-inline: 0.5rem;
+			padding-right: max(0.5rem, var(--safe-area-right, env(safe-area-inset-right)));
+			padding-left: max(0.5rem, var(--safe-area-left, env(safe-area-inset-left)));
 		}
 
 		.focus-title {
@@ -1671,12 +1689,10 @@
 			font-size: 0.78rem;
 		}
 
-		.paper {
+		.editor-shell.distraction-free .paper {
 			width: 100%;
 			margin: 0;
-		}
-
-		.paper {
+			min-height: calc(100dvh - var(--focus-topbar-height) - 3rem);
 			box-shadow: none;
 		}
 

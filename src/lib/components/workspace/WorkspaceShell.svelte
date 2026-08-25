@@ -165,7 +165,11 @@
 
 <style>
 	.workspace-page {
-		--topbar-height: calc(3.45rem + env(safe-area-inset-top));
+		--safe-area-top: env(safe-area-inset-top);
+		--safe-area-right: env(safe-area-inset-right);
+		--safe-area-bottom: env(safe-area-inset-bottom);
+		--safe-area-left: env(safe-area-inset-left);
+		--topbar-height: calc(3.45rem + var(--safe-area-top));
 		min-width: 0;
 		min-height: 0;
 		height: 100vh;
@@ -180,8 +184,8 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
-		padding: env(safe-area-inset-top) max(0.7rem, env(safe-area-inset-right)) 0
-			max(0.7rem, env(safe-area-inset-left));
+		padding: var(--safe-area-top) max(0.7rem, var(--safe-area-right)) 0
+			max(0.7rem, var(--safe-area-left));
 		background: var(--forest-deep);
 		box-shadow: 0 1px 0 rgb(255 255 255 / 8%);
 		color: white;
@@ -333,7 +337,7 @@
 		height: calc(100vh - var(--topbar-height));
 		height: calc(100dvh - var(--topbar-height));
 		grid-template-columns: 17.5rem minmax(0, 1fr);
-		padding-bottom: env(safe-area-inset-bottom);
+		padding-bottom: var(--safe-area-bottom);
 		overflow: hidden;
 	}
 
@@ -350,7 +354,7 @@
 		height: 100vh;
 		height: 100dvh;
 		grid-template-columns: minmax(0, 1fr);
-		padding-bottom: 0;
+		padding-bottom: var(--safe-area-bottom);
 	}
 
 	.sidebar,
@@ -386,7 +390,7 @@
 		.sidebar {
 			position: fixed;
 			z-index: 30;
-			inset: var(--topbar-height) 0 env(safe-area-inset-bottom);
+			inset: var(--topbar-height) 0 var(--safe-area-bottom);
 			visibility: hidden;
 			background: transparent;
 			opacity: 0;

@@ -1,7 +1,6 @@
 import { type Extensions } from '@tiptap/core';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import TextAlign from '@tiptap/extension-text-align';
 import Typography from '@tiptap/extension-typography';
 import StarterKit from '@tiptap/starter-kit';
 import { CommentAnchor } from './comment-anchor';
@@ -38,7 +37,6 @@ export function editorExtensions(placeholder: string): Extensions {
 				HTMLAttributes: { rel: 'noopener noreferrer' }
 			}
 		}),
-		TextAlign.configure({ types: ['heading', 'paragraph'] }),
 		Typography,
 		CommentAnchor,
 		Placeholder.configure({ placeholder }),

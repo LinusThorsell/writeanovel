@@ -278,6 +278,72 @@ test('expands the manuscript into distraction-free writing mode', async ({ page 
 	await expect(page.locator('.workspace-page')).not.toHaveClass(/distraction-free/);
 });
 
+test('uses the full phone width and safe areas in distraction-free mode', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await createNovel(page, 'Pocket Story');
+	await page.getByRole('button', { name: 'Enter distraction-free mode' }).click();
+
+	const workspace = page.locator('.workspace-page');
+	await workspace.evaluate((element) => {
+		const workspaceElement = element as HTMLElement;
+		workspaceElement.style.setProperty('--safe-area-top', '28px');
+		workspaceElement.style.setProperty('--safe-area-right', '12px');
+		workspaceElement.style.setProperty('--safe-area-bottom', '18px');
+		workspaceElement.style.setProperty('--safe-area-left', '12px');
+	});
+
+	const presentation = await page.evaluate(() => {
+		const focusTopbar = document.querySelector<HTMLElement>('.focus-topbar');
+		const focusTitle = document.querySelector<HTMLElement>('.focus-title');
+		const toolbar = document.querySelector<HTMLElement>('.toolbar');
+		const writingColumn = document.querySelector<HTMLElement>('.writing-column');
+		const paper = document.querySelector<HTMLElement>('.paper');
+		const writingSurface = document.querySelector<HTMLElement>('.writing-surface');
+		const heading = document.querySelector<HTMLElement>('.typeset-document-heading');
+		if (
+			!focusTopbar ||
+			!focusTitle ||
+			!toolbar ||
+			!writingColumn ||
+			!paper ||
+			!writingSurface ||
+			!heading
+		) {
+			throw new Error('The mobile writing layout did not render.');
+		}
+
+		const focusBounds = focusTopbar.getBoundingClientRect();
+		const titleBounds = focusTitle.getBoundingClientRect();
+		const toolbarBounds = toolbar.getBoundingClientRect();
+		const columnBounds = writingColumn.getBoundingClientRect();
+		const paperBounds = paper.getBoundingClientRect();
+		const headingBounds = heading.getBoundingClientRect();
+		const writingStyle = getComputedStyle(writingSurface);
+		const paddingInline =
+			Number.parseFloat(writingStyle.paddingLeft) + Number.parseFloat(writingStyle.paddingRight);
+
+		return {
+			focusPaddingTop: Number.parseFloat(getComputedStyle(focusTopbar).paddingTop),
+			toolbarOffset: Math.abs(toolbarBounds.top - focusBounds.bottom),
+			paperGap: Math.abs(paperBounds.top - toolbarBounds.bottom),
+			paperWidthDifference: Math.abs(paperBounds.width - columnBounds.width),
+			contentWidthRatio: (paperBounds.width - paddingInline) / paperBounds.width,
+			headingTopOffset: headingBounds.top - paperBounds.top,
+			titleCenterOffset: Math.abs(titleBounds.left + titleBounds.width / 2 - window.innerWidth / 2),
+			hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth
+		};
+	});
+
+	expect(presentation.focusPaddingTop).toBeGreaterThanOrEqual(34);
+	expect(presentation.toolbarOffset).toBeLessThanOrEqual(1);
+	expect(presentation.paperGap).toBeLessThanOrEqual(1);
+	expect(presentation.paperWidthDifference).toBeLessThanOrEqual(1);
+	expect(presentation.contentWidthRatio).toBeGreaterThan(0.86);
+	expect(presentation.headingTopOffset).toBeLessThanOrEqual(50);
+	expect(presentation.titleCenterOffset).toBeLessThanOrEqual(2);
+	expect(presentation.hasHorizontalOverflow).toBe(false);
+});
+
 test('keeps a long chapter on one continuous scrollable page and restores the writing position after reload', async ({
 	page
 }) => {
@@ -417,7 +483,13 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	await createNovel(page, 'Exportable Story');
 	await page.getByLabel('Page title').fill('The Lantern Room');
 	await page.getByLabel('Page title').press('Enter');
-	await page.locator('.writing-surface').fill('A short chapter for export.');
+	await page
+		.locator('.writing-surface')
+		.fill(
+			'A short chapter for export begins beneath the heading, where every ordinary paragraph should form a calm, even-edged block of readable book text without losing its natural rhythm.'
+		);
+	await page.locator('.writing-surface').press('Control+Shift+L');
+	await page.locator('.writing-surface').press('Control+Shift+E');
 	await page.waitForTimeout(700);
 
 	const typesetHeading = page.getByLabel('Typeset page heading');
@@ -436,7 +508,8 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 		const bodyBounds = body.getBoundingClientRect();
 		const pageBounds = paper.getBoundingClientRect();
 		const headingStyle = getComputedStyle(heading);
-		const bodyStyle = getComputedStyle(writingSurface);
+		const bodyStyle = getComputedStyle(body);
+		const writingStyle = getComputedStyle(writingSurface);
 		return (
 			headingBounds.top > pageBounds.top &&
 			headingBounds.bottom < bodyBounds.top &&
@@ -444,7 +517,10 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 			Math.abs(
 				titleBounds.left + titleBounds.width / 2 - (pageBounds.left + pageBounds.width / 2)
 			) < 1 &&
-			headingStyle.fontFamily === bodyStyle.fontFamily
+			headingStyle.fontFamily === writingStyle.fontFamily &&
+			bodyStyle.textAlign === 'justify' &&
+			bodyStyle.textAlignLast === 'left' &&
+			writingStyle.hyphens === 'auto'
 		);
 	});
 	expect(editorTypesettingMatches).toBe(true);
@@ -464,15 +540,17 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	const firstPageText = firstPageItems.map((item) => item.str).join(' ');
 	expect(firstPageText.replaceAll(' ', '')).toContain('CHAPTER1');
 	expect(firstPageText).toContain('The Lantern Room');
-	expect(firstPageText).toContain('A short chapter for export.');
+	expect(firstPageText).toContain('A short chapter for export');
 	expect(firstPageText).toContain('Page 1');
 	const titleItem = firstPageItems.find((item) => item.str.includes('The Lantern Room'));
-	const bodyItem = firstPageItems.find((item) => item.str.includes('A short chapter for export.'));
+	const bodyItem = firstPageItems.find((item) => item.str.includes('A short chapter for export'));
 	if (!titleItem || !bodyItem)
 		throw new Error('The PDF title or body text could not be positioned.');
 	expect(titleItem.fontSize).toBeGreaterThan(bodyItem.fontSize);
 	expect(titleItem.y).toBeGreaterThan(bodyItem.y);
 	expect(Math.abs(titleItem.x + titleItem.width / 2 - 216)).toBeLessThan(6);
+	expect(bodyItem.x).toBeCloseTo(50, 0);
+	expect(bodyItem.width).toBeGreaterThan(320);
 	expect(await captureRenderedPdfFooter(page, pdfPath)).toMatchSnapshot(
 		'visible-default-page-number-footer.png',
 		{ maxDiffPixelRatio: 0.02 }

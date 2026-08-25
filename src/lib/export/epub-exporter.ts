@@ -80,7 +80,7 @@ h1 { margin: 18vh 0 3rem; text-align: center; font-size: 1.6em; font-weight: nor
 .chapter-label { margin: 18vh 0 .85em; text-align: center; text-indent: 0; font-size: .78em; font-weight: bold; letter-spacing: .12em; text-transform: uppercase; }
 .chapter-label + h1 { margin-top: 0; }
 h2, h3 { margin-top: 2em; }
-p { margin: 0; text-indent: 1.4em; orphans: 2; widows: 2; }
+p { margin: 0; text-align: justify; text-indent: 1.4em; orphans: 2; widows: 2; }
 h1 + p, h2 + p, h3 + p, blockquote p, li p { text-indent: 0; }
 blockquote { margin: 1.5em 2em; font-style: italic; }
 figure { margin: 1.5em auto; text-align: center; }

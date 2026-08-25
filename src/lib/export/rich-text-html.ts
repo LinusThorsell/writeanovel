@@ -50,17 +50,14 @@ function nodeToHtml(node: RichTextNode, assetPath: AssetPathResolver): string {
 	if (node.type === 'text') return applyMarks(node.text ?? '', node.marks);
 
 	const children = childrenToHtml(node, assetPath);
-	const align = stringAttribute(node.attrs?.textAlign);
-	const style = align ? ` style="text-align:${escapeHtml(align)}"` : '';
-
 	switch (node.type) {
 		case 'doc':
 			return children;
 		case 'paragraph':
-			return `<p${style}>${children || '&#160;'}</p>`;
+			return `<p>${children || '&#160;'}</p>`;
 		case 'heading': {
 			const level = Math.min(3, Math.max(1, numberAttribute(node.attrs?.level) ?? 2));
-			return `<h${level}${style}>${children}</h${level}>`;
+			return `<h${level}>${children}</h${level}>`;
 		}
 		case 'blockquote':
 			return `<blockquote>${children}</blockquote>`;

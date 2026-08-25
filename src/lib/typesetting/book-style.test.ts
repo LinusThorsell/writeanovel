@@ -88,6 +88,24 @@ describe('shared book typesetting', () => {
 		expect(editorPage.pageMarginBlock).toBe(
 			Math.round(editorPage.pageHeight * (pdfPage.marginBlock / pdfPage.height))
 		);
+		expect(editorPage.compact).toBe(false);
+	});
+
+	it('uses compact readable gutters on phone-sized editor pages', () => {
+		const editorPage = calculateEditorPageLayout('trade-6x9', 390, true);
+
+		expect(editorPage.compact).toBe(true);
+		expect(editorPage.pageMarginInline).toBeLessThanOrEqual(24);
+		expect(editorPage.pageMarginBlock).toBeLessThanOrEqual(36);
+		expect((390 - editorPage.pageMarginInline * 2) / 390).toBeGreaterThan(0.86);
+	});
+
+	it('gives every exported PDF a conventional centered text frame', () => {
+		for (const page of Object.values(BOOK_PAGE_METRICS)) {
+			const textFrameRatio = (page.width - page.marginInline * 2) / page.width;
+			expect(textFrameRatio).toBeGreaterThan(0.74);
+			expect(textFrameRatio).toBeLessThan(0.78);
+		}
 	});
 
 	it('uses an embeddable PDF counterpart for every editor typography preset', () => {

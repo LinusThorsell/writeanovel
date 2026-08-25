@@ -161,7 +161,7 @@ function blockContent(node: RichTextNode, context: PdfContext): Content[] {
 			return [
 				{
 					text: inlineContent(node),
-					alignment,
+					alignment: 'justify',
 					leadingIndent,
 					margin: [0, 0, 0, bodySize * BOOK_LAYOUT.paragraphGapEm]
 				}

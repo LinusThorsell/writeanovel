@@ -43,6 +43,7 @@ export const BOOK_PAGE_METRICS: Record<TrimSize, BookPageMetrics> = {
 export const BOOK_LAYOUT = {
 	documentHeadingTopRatio: 0.2,
 	documentHeadingGapEm: 3,
+	compactDocumentHeadingGapEm: 2,
 	documentTitleLetterSpacingEm: 0.04,
 	documentLabelLetterSpacingEm: 0.12,
 	documentLabelGapEm: 0.85,
