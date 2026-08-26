@@ -3,6 +3,7 @@
 		AlignCenter,
 		AlignLeft,
 		AlignRight,
+		BookOpen,
 		Bold,
 		CornerDownRight,
 		ImagePlus,
@@ -10,6 +11,7 @@
 		Link,
 		List,
 		ListOrdered,
+		LoaderCircle,
 		Maximize2,
 		MessageSquarePlus,
 		MessagesSquare,
@@ -55,13 +57,15 @@
 		typography: TypographyPreset;
 		trimSize: TrimSize;
 		distractionFree: boolean;
+		pdfPreviewLoading: boolean;
 		focusNavigation: Snippet;
 		itemTitle: string;
 		typesetHeading?: TypesetDocumentHeading;
 		placeholder?: string;
-		onChange: (body: RichTextNode) => void;
-		onCommentsChange: (body: RichTextNode, comments: CommentThread[]) => void;
+		onChange: (body: RichTextNode) => void | Promise<void>;
+		onCommentsChange: (body: RichTextNode, comments: CommentThread[]) => void | Promise<void>;
 		onToggleDistractionFree: () => void | Promise<void>;
+		onPreviewPdf: (anchorText: string) => Promise<void>;
 		onTitleCommit: (title: string) => void;
 		onAddMedia: (file: File) => Promise<MediaInsertion>;
 		onError: (message: string) => void;
@@ -75,6 +79,7 @@
 		typography,
 		trimSize,
 		distractionFree,
+		pdfPreviewLoading,
 		focusNavigation,
 		itemTitle,
 		typesetHeading,
@@ -82,6 +87,7 @@
 		onChange,
 		onCommentsChange,
 		onToggleDistractionFree,
+		onPreviewPdf,
 		onTitleCommit,
 		onAddMedia,
 		onError
@@ -127,6 +133,16 @@
 			? commentAnchorSnapshots(editor.state.doc)
 			: new Map<string, CommentAnchorSnapshot>();
 	});
+
+	async function persistEditorSnapshot(currentEditor: Editor): Promise<void> {
+		const updatedBody = removeTransientAssetSources(currentEditor.getJSON());
+		const updatedComments = commentsWithCurrentQuotes(currentEditor);
+		if (updatedComments === comments) {
+			await onChange(updatedBody);
+		} else {
+			await onCommentsChange(updatedBody, updatedComments);
+		}
+	}
 
 	function updatePaperLayout(element: HTMLElement): void {
 		if (element.clientWidth <= 0) return;
@@ -222,13 +238,7 @@
 				}
 				if (saveTimer) clearTimeout(saveTimer);
 				saveTimer = setTimeout(() => {
-					const updatedBody = removeTransientAssetSources(updatedEditor.getJSON());
-					const updatedComments = commentsWithCurrentQuotes(updatedEditor);
-					if (updatedComments === comments) {
-						onChange(updatedBody);
-					} else {
-						onCommentsChange(updatedBody, updatedComments);
-					}
+					void persistEditorSnapshot(updatedEditor);
 				}, 350);
 			}
 		});
@@ -563,9 +573,98 @@
 	function blurFocusTitleOnEnter(event: KeyboardEvent): void {
 		if (event.key === 'Enter') (event.currentTarget as HTMLInputElement).blur();
 	}
+
+	function textExcerpt(value: string, offset = 0): string {
+		const start = Math.max(0, offset - 32);
+		const words = value
+			.slice(start, start + 240)
+			.replace(/\s+/g, ' ')
+			.trim()
+			.split(' ');
+		if (start > 0) words.shift();
+		return words.slice(0, 24).join(' ');
+	}
+
+	function visibleTextAnchor(): string {
+		const writingSurface = editor?.view.dom;
+		const editorArea = paperElement?.closest<HTMLElement>('.editor-area');
+		if (!writingSurface || !editorArea) return '';
+
+		const areaBounds = editorArea.getBoundingClientRect();
+		const toolbarBounds = editorArea
+			.querySelector<HTMLElement>('.toolbar')
+			?.getBoundingClientRect();
+		const surfaceBounds = writingSurface.getBoundingClientRect();
+		const surfaceStyle = getComputedStyle(writingSurface);
+		const viewportTop = Math.max(areaBounds.top, toolbarBounds?.bottom ?? areaBounds.top) + 10;
+		const viewportBottom = areaBounds.bottom - 10;
+		const contentLeft =
+			surfaceBounds.left + Number.parseFloat(surfaceStyle.paddingInlineStart || '0') + 8;
+		const samplePoints = [
+			contentLeft,
+			contentLeft + (surfaceBounds.right - contentLeft) * 0.35,
+			contentLeft + (surfaceBounds.right - contentLeft) * 0.7
+		];
+		type CaretDocument = Document & {
+			caretPositionFromPoint?: (
+				x: number,
+				y: number
+			) => { offsetNode: Node; offset: number } | null;
+			caretRangeFromPoint?: (x: number, y: number) => Range | null;
+		};
+		const caretDocument = document as CaretDocument;
+
+		for (const x of samplePoints) {
+			const position = caretDocument.caretPositionFromPoint?.(x, viewportTop);
+			const fallbackRange = position
+				? undefined
+				: caretDocument.caretRangeFromPoint?.(x, viewportTop);
+			const node = position?.offsetNode ?? fallbackRange?.startContainer;
+			const offset = position?.offset ?? fallbackRange?.startOffset;
+			if (!node || offset === undefined || !writingSurface.contains(node)) continue;
+			const nodeElement = node instanceof Element ? node : node.parentElement;
+			const block = nodeElement?.closest<HTMLElement>('p, h1, h2, h3, blockquote, li');
+			if (!block || !writingSurface.contains(block)) continue;
+
+			const range = document.createRange();
+			range.selectNodeContents(block);
+			try {
+				range.setEnd(node, offset);
+			} catch {
+				continue;
+			}
+			const excerpt = textExcerpt(block.textContent ?? '', range.toString().length);
+			if (excerpt) return excerpt;
+		}
+
+		const visibleBlocks = Array.from(
+			writingSurface.querySelectorAll<HTMLElement>('p, h1, h2, h3, blockquote, li')
+		).filter((block) => {
+			const bounds = block.getBoundingClientRect();
+			return (
+				bounds.bottom > viewportTop && bounds.top < viewportBottom && block.textContent?.trim()
+			);
+		});
+		return textExcerpt(visibleBlocks[0]?.textContent ?? '');
+	}
+
+	async function requestPdfPreview(): Promise<void> {
+		if (!editor || pdfPreviewLoading) return;
+		const anchorText = visibleTextAnchor();
+		if (saveTimer) {
+			clearTimeout(saveTimer);
+			saveTimer = undefined;
+		}
+		try {
+			await persistEditorSnapshot(editor);
+			await onPreviewPdf(anchorText);
+		} catch (error) {
+			onError(error instanceof Error ? error.message : 'The PDF preview could not be created.');
+		}
+	}
 </script>
 
-<div class="editor-shell" class:distraction-free={distractionFree}>
+<div class="editor-shell writing-view" class:distraction-free={distractionFree}>
 	{#if distractionFree}
 		<div class="focus-topbar" aria-label="Distraction-free writing controls">
 			<div class="focus-navigation-slot">{@render focusNavigation()}</div>
@@ -689,6 +788,22 @@
 			{#if comments.length > 0}<span class="comment-count">{comments.length}</span>{/if}
 		</button>
 		<span class="toolbar-spacer"></span>
+		<button
+			type="button"
+			class="preview-button"
+			aria-label="Preview book PDF"
+			title="Preview the exported PDF at the text in view"
+			disabled={pdfPreviewLoading}
+			onclick={requestPdfPreview}
+		>
+			{#if pdfPreviewLoading}
+				<span class="preview-spinner"><LoaderCircle size={17} /></span>
+			{:else}
+				<BookOpen size={17} />
+			{/if}
+			<span class="preview-button-label">Preview PDF</span>
+		</button>
+		<span class="divider"></span>
 		{#if !distractionFree}
 			<button
 				type="button"
@@ -1005,6 +1120,21 @@
 		background: rgb(39 72 59 / 11%);
 	}
 
+	.toolbar .preview-button {
+		display: inline-flex;
+		width: auto;
+		min-width: 7.25rem;
+		gap: 0.4rem;
+		padding: 0 0.45rem;
+		font-size: 0.7rem;
+		font-weight: 750;
+	}
+
+	.preview-spinner {
+		display: grid;
+		animation: preview-spin 900ms linear infinite;
+	}
+
 	.toolbar button:disabled,
 	.image-toolbar button:disabled {
 		color: #a9ada9;
@@ -1201,6 +1331,22 @@
 		margin: var(--blockquote-margin-block) var(--blockquote-margin-inline);
 		color: #48524d;
 		font-style: italic;
+	}
+
+	.editor-shell.writing-view .editor-mount :global(.writing-surface) {
+		hyphens: none;
+		overflow-wrap: break-word;
+		text-wrap: wrap;
+	}
+
+	.editor-shell.writing-view .editor-mount :global(.writing-surface p) {
+		margin-bottom: 0.9em;
+		text-align: left;
+		text-align-last: auto;
+	}
+
+	.editor-shell.writing-view .editor-mount :global(.writing-surface p + p) {
+		text-indent: 0;
 	}
 
 	.editor-mount :global(.writing-surface .comment-anchor) {
@@ -1677,6 +1823,14 @@
 	}
 
 	@media (max-width: 760px) {
+		.preview-button-label {
+			display: none;
+		}
+
+		.toolbar .preview-button {
+			min-width: 2.15rem;
+		}
+
 		.focus-topbar {
 			grid-template-columns: minmax(3.25rem, 1fr) minmax(8rem, 1.6fr) minmax(3.25rem, 1fr);
 			gap: 0.4rem;
@@ -1704,6 +1858,12 @@
 			border-right: 0;
 			border-left: 0;
 			border-radius: 0;
+		}
+	}
+
+	@keyframes preview-spin {
+		to {
+			transform: rotate(360deg);
 		}
 	}
 </style>

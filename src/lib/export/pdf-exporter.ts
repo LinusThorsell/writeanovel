@@ -42,7 +42,7 @@ import {
 	typesetDocumentHeading,
 	type BookTypographyStyle
 } from '$lib/typesetting/book-style';
-import { safeFileName } from './download';
+import { downloadBlob, safeFileName } from './download';
 
 type PreparedPdfAsset = { kind: 'image'; source: string } | { kind: 'svg'; source: string };
 
@@ -492,8 +492,13 @@ export async function buildPdfDefinition(
 	};
 }
 
-export async function exportPdf(workspace: WorkspaceSnapshot): Promise<void> {
+export async function buildPdfBlob(workspace: WorkspaceSnapshot): Promise<Blob> {
 	await prepareFonts();
 	const definition = await buildPdfDefinition(workspace);
-	await pdfMake.createPdf(definition).download(`${safeFileName(workspace.project.title)}.pdf`);
+	return pdfMake.createPdf(definition).getBlob();
+}
+
+export async function exportPdf(workspace: WorkspaceSnapshot): Promise<void> {
+	const blob = await buildPdfBlob(workspace);
+	downloadBlob(blob, `${safeFileName(workspace.project.title)}.pdf`);
 }

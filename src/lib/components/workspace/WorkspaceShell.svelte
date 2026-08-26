@@ -13,7 +13,9 @@
 	import type { Attachment } from 'svelte/attachments';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import InstallApplicationButton from '$lib/components/application/InstallApplicationButton.svelte';
+	import PdfPreviewModal from '$lib/components/editor/PdfPreviewModal.svelte';
 	import BookSettingsModal from '$lib/components/settings/BookSettingsModal.svelte';
+	import type { PdfPreview } from '$lib/export/pdf-preview';
 	import EditorPane from './EditorPane.svelte';
 	import WorkspaceSidebar from './WorkspaceSidebar.svelte';
 
@@ -21,12 +23,19 @@
 	let sidebarOpen = $state(false);
 	let exportOpen = $state(false);
 	let distractionFree = $state(false);
+	let pdfPreviewOpen = $state(false);
+	let pdfPreviewLoading = $state(false);
+	let pdfPreview = $state.raw<PdfPreview>();
+	let pdfPreviewUrl = $state<string>();
+	let previewRequestId = 0;
 	let workspaceElement: HTMLDivElement | undefined;
 
 	const captureWorkspace: Attachment<HTMLDivElement> = (element) => {
 		workspaceElement = element;
 		return () => {
 			if (workspaceElement === element) workspaceElement = undefined;
+			previewRequestId += 1;
+			revokePdfPreviewUrl();
 		};
 	};
 
@@ -56,6 +65,50 @@
 				// The layout can still leave focus mode if the browser owns fullscreen state.
 			}
 		}
+	}
+
+	function revokePdfPreviewUrl(): void {
+		if (!pdfPreviewUrl) return;
+		URL.revokeObjectURL(pdfPreviewUrl);
+		pdfPreviewUrl = undefined;
+	}
+
+	async function showPdfPreview(anchorText: string): Promise<void> {
+		const workspace = model.workspace;
+		if (!workspace || pdfPreviewLoading) return;
+		const requestId = ++previewRequestId;
+		revokePdfPreviewUrl();
+		pdfPreview = undefined;
+		pdfPreviewOpen = true;
+		pdfPreviewLoading = true;
+
+		try {
+			const { createPdfPreview } = await import('$lib/export/pdf-preview');
+			const preview = await createPdfPreview(
+				workspace,
+				anchorText,
+				model.activeDocument?.title ?? ''
+			);
+			if (requestId !== previewRequestId) return;
+			pdfPreview = preview;
+			pdfPreviewUrl = URL.createObjectURL(preview.blob);
+		} catch (error) {
+			if (requestId !== previewRequestId) return;
+			pdfPreviewOpen = false;
+			model.showError(
+				error instanceof Error ? error.message : 'The PDF preview could not be created.'
+			);
+		} finally {
+			if (requestId === previewRequestId) pdfPreviewLoading = false;
+		}
+	}
+
+	function closePdfPreview(): void {
+		previewRequestId += 1;
+		pdfPreviewOpen = false;
+		pdfPreviewLoading = false;
+		pdfPreview = undefined;
+		revokePdfPreviewUrl();
 	}
 
 	function handleFullscreenChange(): void {
@@ -155,12 +208,27 @@
 				<WorkspaceSidebar {model} />
 			</div>
 		</div>
-		<EditorPane {model} {distractionFree} onToggleDistractionFree={toggleDistractionFree} />
+		<EditorPane
+			{model}
+			{distractionFree}
+			{pdfPreviewLoading}
+			onToggleDistractionFree={toggleDistractionFree}
+			onPreviewPdf={showPdfPreview}
+		/>
 	</div>
 </div>
 
 {#if model.settingsOpen}
 	<BookSettingsModal {model} />
+{/if}
+
+{#if pdfPreviewOpen}
+	<PdfPreviewModal
+		preview={pdfPreview}
+		url={pdfPreviewUrl}
+		loading={pdfPreviewLoading}
+		onClose={closePdfPreview}
+	/>
 {/if}
 
 <style>

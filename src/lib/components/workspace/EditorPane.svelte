@@ -20,10 +20,13 @@
 	type Props = {
 		model: WriteANovelState;
 		distractionFree: boolean;
+		pdfPreviewLoading: boolean;
 		onToggleDistractionFree: () => void | Promise<void>;
+		onPreviewPdf: (anchorText: string) => Promise<void>;
 	};
 
-	let { model, distractionFree, onToggleDistractionFree }: Props = $props();
+	let { model, distractionFree, pdfPreviewLoading, onToggleDistractionFree, onPreviewPdf }: Props =
+		$props();
 	let chapterHeadingOpen = $state(false);
 	const typesetHeading: TypesetDocumentHeading | undefined = $derived.by(() => {
 		if (!model.workspace || !model.activeDocument) return undefined;
@@ -162,7 +165,9 @@
 						typography={model.workspace?.project.typography ?? 'literary'}
 						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
 						{distractionFree}
+						{pdfPreviewLoading}
 						{onToggleDistractionFree}
+						{onPreviewPdf}
 						{focusNavigation}
 						itemTitle={model.activeDocument.title}
 						onTitleCommit={updateTitle}
@@ -187,7 +192,9 @@
 						typography="modern"
 						trimSize={model.workspace?.project.trimSize ?? 'trade-6x9'}
 						{distractionFree}
+						{pdfPreviewLoading}
 						{onToggleDistractionFree}
+						{onPreviewPdf}
 						{focusNavigation}
 						itemTitle={model.activeNote.title}
 						onTitleCommit={updateTitle}

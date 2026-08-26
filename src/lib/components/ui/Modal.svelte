@@ -8,7 +8,7 @@
 		onClose: () => void;
 		children: Snippet;
 		footer?: Snippet;
-		width?: 'small' | 'medium' | 'large';
+		width?: 'small' | 'medium' | 'large' | 'preview';
 	};
 
 	let { title, description, onClose, children, footer, width = 'medium' }: Props = $props();
@@ -26,6 +26,7 @@
 		class="modal"
 		class:small={width === 'small'}
 		class:large={width === 'large'}
+		class:preview={width === 'preview'}
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="modal-title"
@@ -86,6 +87,26 @@
 
 	.modal.large {
 		width: min(54rem, 100%);
+	}
+
+	.modal.preview {
+		display: flex;
+		width: min(80rem, 100%);
+		height: min(64rem, 100%);
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.modal.preview .content {
+		min-height: 0;
+		flex: 1;
+		padding: 0;
+		overflow: hidden;
+	}
+
+	.modal.preview header,
+	.modal.preview footer {
+		flex: 0 0 auto;
 	}
 
 	header {

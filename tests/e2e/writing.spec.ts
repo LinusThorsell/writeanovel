@@ -468,6 +468,73 @@ test('keeps a long chapter on one continuous scrollable page and restores the wr
 		.toBeLessThan(scrollPosition.progress + 0.002);
 });
 
+test('uses writing flow by default and previews the PDF at the visible text', async ({ page }) => {
+	await createNovel(page, 'Previewed Story');
+	const editor = page.locator('.writing-surface');
+	const paragraphs = Array.from(
+		{ length: 35 },
+		(_, index) =>
+			`Anchor passage ${index + 1}. The road crossed the valley while a unique compass marker ${index + 1} pointed toward the distant harbor and the evening light changed over the hills.`
+	);
+	await editor.fill(paragraphs.join('\n\n'));
+	await page.waitForTimeout(1_800);
+
+	await expect(page.getByRole('switch', { name: 'Book formatting' })).toHaveCount(0);
+	await expect(page.locator('.editor-shell')).toHaveClass(/writing-view/);
+	await expect(page.getByLabel('Typeset page heading')).toBeVisible();
+
+	const writingPresentation = await page.evaluate(() => {
+		const paper = document.querySelector<HTMLElement>('.paper');
+		const paragraph = document.querySelector<HTMLElement>('.writing-surface p + p');
+		if (!paper || !paragraph) return undefined;
+		const style = getComputedStyle(paragraph);
+		return {
+			paperWidth: paper.getBoundingClientRect().width,
+			textAlign: style.textAlign,
+			textIndent: Number.parseFloat(style.textIndent),
+			hyphens: style.hyphens,
+			fontFamily: style.fontFamily,
+			fontSize: style.fontSize,
+			lineHeight: style.lineHeight,
+			marginBottom: Number.parseFloat(style.marginBottom)
+		};
+	});
+
+	expect(writingPresentation).toBeDefined();
+	expect(writingPresentation!.paperWidth).toBeLessThanOrEqual(736);
+	expect(writingPresentation!.textAlign).toBe('left');
+	expect(writingPresentation!.textIndent).toBe(0);
+	expect(writingPresentation!.hyphens).toBe('none');
+	expect(writingPresentation!.fontFamily).toContain('Libre Baskerville');
+	expect(writingPresentation!.fontSize).toBe('16px');
+	expect(Number.parseFloat(writingPresentation!.lineHeight)).toBeGreaterThan(20);
+	expect(writingPresentation!.marginBottom).toBeGreaterThan(10);
+
+	const editorArea = page.locator('.editor-area');
+	const maximumScroll = await editorArea.evaluate(
+		(element) => element.scrollHeight - element.clientHeight
+	);
+	await editorArea.hover();
+	await page.mouse.wheel(0, maximumScroll * 0.7);
+	await expect
+		.poll(() => editorArea.evaluate((element) => element.scrollTop))
+		.toBeGreaterThan(1_000);
+	await page.getByRole('button', { name: 'Preview book PDF' }).click();
+
+	const previewDialog = page.getByRole('dialog', { name: 'PDF preview' });
+	await expect(previewDialog).toBeVisible();
+	await expect(previewDialog).toContainText('aligned to the text in view', { timeout: 30_000 });
+	const previewFrame = previewDialog.getByTitle('Rendered PDF preview');
+	await expect(previewFrame).toHaveAttribute('src', /#page=/, { timeout: 30_000 });
+	const previewSource = await previewFrame.getAttribute('src');
+	if (!previewSource) throw new Error('The rendered PDF preview did not have a source.');
+	const previewParameters = new URLSearchParams(previewSource.split('#')[1]);
+	expect(Number(previewParameters.get('page'))).toBeGreaterThan(1);
+	expect(previewParameters.get('view')).toMatch(/^FitH,\d+$/);
+	expect(previewParameters.has('search')).toBe(false);
+	await previewDialog.getByRole('button', { name: 'Close' }).click();
+});
+
 test('anonymous free writing makes no PocketBase requests', async ({ page }) => {
 	const backendRequests: string[] = [];
 	page.on('request', (request) => {
@@ -495,7 +562,7 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	const typesetHeading = page.getByLabel('Typeset page heading');
 	await expect(typesetHeading).toContainText('Chapter 1');
 	await expect(typesetHeading).toContainText('The Lantern Room');
-	const editorTypesettingMatches = await page.evaluate(() => {
+	const editorWritingFlowMatches = await page.evaluate(() => {
 		const heading = document.querySelector<HTMLElement>('.typeset-document-heading');
 		const title = heading?.querySelector<HTMLElement>('h1');
 		const body = document.querySelector<HTMLElement>('.writing-surface p');
@@ -518,16 +585,17 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 				titleBounds.left + titleBounds.width / 2 - (pageBounds.left + pageBounds.width / 2)
 			) < 1 &&
 			headingStyle.fontFamily === writingStyle.fontFamily &&
-			bodyStyle.textAlign === 'justify' &&
-			bodyStyle.textAlignLast === 'left' &&
-			writingStyle.hyphens === 'auto'
+			bodyStyle.textAlign === 'left' &&
+			bodyStyle.textAlignLast === 'auto' &&
+			Number.parseFloat(bodyStyle.textIndent) === 0 &&
+			writingStyle.hyphens === 'none'
 		);
 	});
-	expect(editorTypesettingMatches).toBe(true);
+	expect(editorWritingFlowMatches).toBe(true);
 
 	await page.getByText('Export', { exact: true }).click();
 	const pdfDownload = page.waitForEvent('download');
-	await page.getByRole('button', { name: /PDF/ }).click();
+	await page.locator('.export-menu').getByRole('button', { name: /PDF/ }).click();
 	const downloadedPdf = await pdfDownload;
 	expect(downloadedPdf.suggestedFilename()).toBe('exportable-story.pdf');
 	const pdfPath = await downloadedPdf.path();
@@ -567,7 +635,7 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 	await page.getByText('Export', { exact: true }).click();
 	const modernPdfDownload = page.waitForEvent('download');
-	await page.getByRole('button', { name: /PDF/ }).click();
+	await page.locator('.export-menu').getByRole('button', { name: /PDF/ }).click();
 	const modernPdfPath = await (await modernPdfDownload).path();
 	if (!modernPdfPath) throw new Error('The Modern preset PDF was not available for verification.');
 	expect(await captureRenderedPdfFooter(page, modernPdfPath)).toMatchSnapshot(
@@ -634,7 +702,7 @@ test('configures a visible document range, sequence, numeral style, template, an
 
 	await page.getByText('Export', { exact: true }).click();
 	const pdfDownload = page.waitForEvent('download');
-	await page.getByRole('button', { name: /PDF/ }).click();
+	await page.locator('.export-menu').getByRole('button', { name: /PDF/ }).click();
 	const pdfPath = await (await pdfDownload).path();
 	if (!pdfPath) throw new Error('The numbered PDF was not available for verification.');
 	const extracted = await extractTextItems(new Uint8Array(await readFile(pdfPath)));
@@ -681,7 +749,7 @@ test('uses book-wide chapter headings with persistent per-chapter overrides in t
 
 	await page.getByText('Export', { exact: true }).click();
 	const pdfDownload = page.waitForEvent('download');
-	await page.getByRole('button', { name: /PDF/ }).click();
+	await page.locator('.export-menu').getByRole('button', { name: /PDF/ }).click();
 	const pdfPath = await (await pdfDownload).path();
 	if (!pdfPath) throw new Error('The heading PDF was not available for verification.');
 	const extracted = await extractTextItems(new Uint8Array(await readFile(pdfPath)));
