@@ -70,7 +70,7 @@ test('fits the mobile viewport and offers application installation', async ({ pa
 		window.dispatchEvent(installEvent);
 	});
 
-	const installButton = page.getByRole('button', { name: 'Install application' });
+	const installButton = page.getByRole('button', { name: 'Add to home screen' });
 	await expect(installButton).toBeVisible();
 	await installButton.click();
 	await expect(installButton).toBeHidden();

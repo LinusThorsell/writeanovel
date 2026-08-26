@@ -2,7 +2,6 @@
 	import {
 		BookOpenText,
 		Check,
-		Cloud,
 		Download,
 		Feather,
 		FileStack,
@@ -10,6 +9,7 @@
 		Image,
 		Map,
 		MoveRight,
+		ShieldCheck,
 		Sparkles,
 		UsersRound
 	} from '@lucide/svelte';
@@ -19,7 +19,7 @@
 
 	const title = 'WriteANovel — Offline Novel Writing Software & Book Editor';
 	const description =
-		'Plan, write, and typeset complete novels in a private offline-first book editor. Organize chapters and story notes, then export PDF and EPUB.';
+		'Plan, write, and format complete novels in a private writing studio that works without internet. Organize chapters and notes, then export PDF and EPUB.';
 	const workflow = [
 		{
 			step: '01',
@@ -36,27 +36,27 @@
 		{
 			step: '03',
 			title: 'Shape the book',
-			text: 'Choose book typography, add pages and covers, then position artwork visually.',
+			text: 'Choose the book size and reading style, add pages and covers, then place artwork.',
 			icon: BookOpenText
 		},
 		{
 			step: '04',
 			title: 'Export and share',
-			text: 'Download a typeset PDF and a reflowable EPUB 3 file directly.',
+			text: 'Download a PDF for sharing or printing and an EPUB for reading apps.',
 			icon: Download
 		}
 	] as const;
 	const featureLinks = [
 		{
 			eyebrow: 'Private-first writing',
-			title: 'Free manuscripts stay on your device',
-			text: 'Start without registration. The free path stores projects in the browser and never needs the manuscript database.',
+			title: 'Your writing stays on your device',
+			text: 'Start without an account. Your novels are saved automatically and stay private.',
 			href: '/offline-novel-writing',
-			link: 'How offline writing works',
+			link: 'How your writing stays safe',
 			icon: HardDrive
 		},
 		{
-			eyebrow: 'A useful story bible',
+			eyebrow: 'Story notes',
 			title: 'Plan without leaving the draft',
 			text: 'Give chapters, characters, environments, plotlines, and general notes clear places inside every novel.',
 			href: '/novel-planning',
@@ -65,10 +65,10 @@
 		},
 		{
 			eyebrow: 'Book-aware editing',
-			title: 'Typesetting without typesetting syntax',
-			text: 'Use WYSIWYG controls, trim and typography presets, covers, raster images, and resizable SVG artwork.',
+			title: 'Book formatting made simple',
+			text: 'Choose a book size and reading style, add covers, and place or resize images.',
 			href: '/book-typesetting',
-			link: 'See typesetting and export',
+			link: 'See book design and export',
 			icon: Sparkles
 		}
 	] as const;
@@ -78,22 +78,22 @@
 
 <section class="hero">
 	<div class="hero-copy">
-		<p class="eyebrow">Private-first novel writing software</p>
+		<p class="eyebrow">Private novel writing</p>
 		<h1>Write the novel. <em>Shape the book.</em></h1>
 		<p class="hero-intro">
-			A calm, offline-first writing studio for planning stories, drafting chapters, creating book
-			pages, and exporting a finished PDF or EPUB.
+			A calm writing studio for planning stories, drafting chapters, creating book pages, and
+			exporting a finished PDF or EPUB—even without internet.
 		</p>
 		<div class="hero-actions">
 			<a class="button button-primary" href={resolve('/app')}
-				>Start writing free <MoveRight size={17} /></a
+				>Start writing <MoveRight size={17} /></a
 			>
 			<a class="button button-secondary" href={resolve('/features')}>Explore every feature</a>
 		</div>
 		<ul class="hero-promises">
 			<li><Check size={15} />No account required</li>
 			<li><Check size={15} />Works offline</li>
-			<li><Check size={15} />Your first novel costs nothing</li>
+			<li><Check size={15} />Your writing stays private</li>
 		</ul>
 	</div>
 
@@ -130,16 +130,16 @@
 
 <section class="confidence" aria-label="WriteANovel capabilities">
 	<div>
-		<HardDrive size={21} /><span><strong>Local by default</strong>Free drafts stay private</span>
+		<HardDrive size={21} /><span><strong>Local by default</strong>Your writing stays private</span>
 	</div>
 	<div>
 		<FileStack size={21} /><span><strong>Book structure</strong>Chapters renumber themselves</span>
 	</div>
 	<div>
-		<Image size={21} /><span><strong>Visual media</strong>Place images and SVG artwork</span>
+		<Image size={21} /><span><strong>Images</strong>Place and resize artwork</span>
 	</div>
 	<div>
-		<Cloud size={21} /><span><strong>Optional cloud</strong>Premium migration is explicit</span>
+		<ShieldCheck size={21} /><span><strong>Safe by design</strong>Your writing stays yours</span>
 	</div>
 </section>
 
@@ -167,27 +167,29 @@
 <section class="privacy-section">
 	<div class="privacy-copy">
 		<p class="eyebrow">A private offline novel editor</p>
-		<h2>Your unfinished story is not server rent.</h2>
+		<h2>Your writing stays local and safe.</h2>
 		<p>
-			Free writers can open the studio and begin immediately. Projects save to IndexedDB in the
-			current browser, and anonymous manuscript work does not call PocketBase.
+			WriteANovel saves your novels on this device as you work. You can begin without an account,
+			and your writing stays private.
 		</p>
 		<p>
-			Premium accounts add authoritative cloud storage only after an explicit migration. A full
-			offline cache stays on the device, so a lost connection does not end the writing session.
+			Keep writing without an internet connection, and download a copy whenever you want an extra
+			backup.
 		</p>
-		<a href={resolve('/offline-novel-writing')}>Read the storage model <MoveRight size={16} /></a>
+		<a href={resolve('/offline-novel-writing')}
+			>Learn how your writing stays safe <MoveRight size={16} /></a
+		>
 	</div>
 	<div class="privacy-card">
 		<div class="privacy-orbit"><HardDrive size={32} /></div>
-		<h3>Free mode</h3>
+		<h3>Local and safe</h3>
 		<ul>
-			<li><Check size={16} />No registration</li>
-			<li><Check size={16} />Local browser database</li>
-			<li><Check size={16} />Offline application cache</li>
-			<li><Check size={16} />PDF and EPUB files you control</li>
+			<li><Check size={16} />No account required</li>
+			<li><Check size={16} />Saved automatically on this device</li>
+			<li><Check size={16} />Works without internet</li>
+			<li><Check size={16} />Download a copy whenever you like</li>
 		</ul>
-		<div class="cloud-note"><Cloud size={17} />Cloud sync stays off until you choose premium.</div>
+		<div class="cloud-note"><ShieldCheck size={17} />Your writing stays private by default.</div>
 	</div>
 </section>
 
@@ -227,21 +229,19 @@
 		</div>
 	</div>
 	<div class="typeset-copy">
-		<p class="eyebrow">Typesetting made visible</p>
+		<p class="eyebrow">Book design made visible</p>
 		<h2>Write visually. Export like a book.</h2>
 		<p>
-			Choose 6 × 9 inch or another trim preset, begin with Libre Baskerville or a different
-			typographic voice, and see the hierarchy while you write. No markup language is required.
+			Choose the finished page size and reading style, then see how headings and paragraphs will
+			look while you write.
 		</p>
 		<ul>
-			<li><Check size={17} />Front matter, back matter, and covers</li>
-			<li><Check size={17} />Positioned and resizable raster or SVG artwork</li>
-			<li><Check size={17} />Direct typeset PDF download</li>
-			<li><Check size={17} />Reflowable EPUB 3 download</li>
+			<li><Check size={17} />Opening and closing book pages</li>
+			<li><Check size={17} />Covers and images you can place and resize</li>
+			<li><Check size={17} />PDF for sharing or printing</li>
+			<li><Check size={17} />EPUB for reading apps and book stores</li>
 		</ul>
-		<a class="button button-secondary" href={resolve('/book-typesetting')}
-			>Explore book typesetting</a
-		>
+		<a class="button button-secondary" href={resolve('/book-typesetting')}>Explore book design</a>
 	</div>
 </section>
 
@@ -252,28 +252,20 @@
 	</div>
 	<div class="faq-grid">
 		<article>
-			<h3>Is WriteANovel really free to start?</h3>
-			<p>
-				Yes. The local writing mode needs no account and supports projects, chapters, planning,
-				typesetting, media, and export.
-			</p>
+			<h3>Do I need an account to start?</h3>
+			<p>No. Open the studio and begin writing. Your novels are saved on this device.</p>
 		</article>
 		<article>
 			<h3>Will it work without internet?</h3>
-			<p>
-				Yes. Once loaded and installed by the browser, the editor and local manuscripts remain
-				available offline.
-			</p>
+			<p>Yes. Open WriteANovel once while connected, then keep writing without internet.</p>
 		</article>
 		<article>
 			<h3>Can I write more than one novel?</h3>
 			<p>Yes. Every project has its own manuscript, book settings, notes, and media library.</p>
 		</article>
 		<article>
-			<h3>Do I need to understand typesetting?</h3>
-			<p>
-				No. Sensible presets and WYSIWYG controls turn publishing concepts into visible choices.
-			</p>
+			<h3>Do I need to understand book formatting?</h3>
+			<p>No. Choose the look you want and see the result while you write.</p>
 		</article>
 	</div>
 </section>
@@ -282,7 +274,7 @@
 	<div>
 		<p class="eyebrow">The blank page is ready</p>
 		<h2>Start the novel you keep meaning to write.</h2>
-		<p>No account. No setup maze. Just a first chapter waiting in your browser.</p>
+		<p>No account. No setup maze. Just a first chapter waiting on this device.</p>
 	</div>
 	<a class="button" href={resolve('/app')}>Open WriteANovel <MoveRight size={17} /></a>
 </section>

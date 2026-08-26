@@ -12,7 +12,7 @@
 		<a href={resolve('/features')}>Features</a>
 		<a href={resolve('/offline-novel-writing')}>Write offline</a>
 		<a href={resolve('/novel-planning')}>Plan a novel</a>
-		<a href={resolve('/book-typesetting')}>Typeset & export</a>
+		<a href={resolve('/book-typesetting')}>Book design & export</a>
 	</nav>
 	<a class="studio-link" href={resolve('/app')}>Open writing studio</a>
 </header>

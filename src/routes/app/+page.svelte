@@ -35,8 +35,8 @@
 		<h1>{failed ? 'The studio could not open' : 'Opening your writing studio…'}</h1>
 		<p>
 			{failed
-				? 'Reload the page to try again. Your locally saved manuscripts have not been changed.'
-				: 'Your private local library is being prepared.'}
+				? 'Reload the page to try again. Your writing is safe.'
+				: 'Getting your novels ready.'}
 		</p>
 	</main>
 {/if}

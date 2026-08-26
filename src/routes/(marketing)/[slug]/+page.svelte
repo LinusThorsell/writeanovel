@@ -31,8 +31,7 @@
 	<h1>{content.heading}</h1>
 	<p>{content.introduction}</p>
 	<div class="hero-actions">
-		<a class="button button-primary" href={resolve('/app')}
-			>Start writing free <MoveRight size={17} /></a
+		<a class="button button-primary" href={resolve('/app')}>Start writing <MoveRight size={17} /></a
 		>
 		<a class="button button-secondary" href={resolve('/features')}>See all features</a>
 	</div>

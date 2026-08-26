@@ -34,21 +34,21 @@ test('rejects self-service premium, then migrates after administrator assignment
 		await page.locator('.writing-surface').fill('This manuscript began as a free local novel.');
 		await page.waitForTimeout(700);
 		await page.getByRole('button', { name: 'Book settings' }).click();
-		await page.getByLabel('Chapter label text').fill('Part {number}');
-		await page.getByRole('checkbox', { name: /Chapter title/ }).uncheck();
-		await page.getByLabel('Numbering sequence').selectOption('restart');
+		await page.getByLabel('Chapter number wording').fill('Part #');
+		await page.getByRole('checkbox', { name: 'Show the chapter title' }).uncheck();
+		await page.getByLabel('Where page counting begins').selectOption('restart');
 		await page.getByLabel('Restart page numbering at').fill('3');
 		await page.getByLabel('Page number style').selectOption('roman');
 		await page.getByLabel('Page number position').selectOption('bottom-center');
-		await page.getByLabel('Page number text').fill('Cloud {number}');
+		await page.getByLabel('How page numbers look').fill('Cloud #');
 		await page.getByRole('button', { name: 'Save book settings' }).click();
 		await page.getByRole('button', { name: 'Chapter heading' }).click();
-		await page.getByRole('checkbox', { name: /Use book-wide heading style/ }).uncheck();
-		await page.getByLabel('Chapter label text').fill('Act {number}');
+		await page.getByRole('checkbox', { name: /Use the same heading as other chapters/ }).uncheck();
+		await page.getByLabel('Chapter number wording').fill('Act #');
 		await page.getByRole('button', { name: 'Save chapter heading' }).click();
-		await expect(page.getByLabel('Typeset page heading')).toContainText('Act 1');
+		await expect(page.getByLabel('Book page heading')).toContainText('Act 1');
 
-		await page.getByRole('button', { name: 'Account and cloud storage' }).click();
+		await page.getByRole('button', { name: 'Your account and saving' }).click();
 		await page.getByRole('tab', { name: 'Create account' }).click();
 		const email = `writer-${Date.now()}@example.test`;
 		const password = 'a-long-test-password';
@@ -57,8 +57,7 @@ test('rejects self-service premium, then migrates after administrator assignment
 		await page.getByLabel('Password').fill(password);
 		await page.getByRole('button', { name: 'Create account', exact: true }).click();
 		await expect(page.getByText(email)).toBeVisible();
-		await expect(page.getByText('Premium access is invite-only during this demo.')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Enable premium demo' })).toHaveCount(0);
+		await expect(page.getByText('Saved on this device')).toBeVisible();
 
 		const userClient = new PocketBase(process.env.POCKETBASE_URL ?? 'http://127.0.0.1:8090');
 		const userAuth = await userClient.collection('users').authWithPassword(email, password);
@@ -69,10 +68,8 @@ test('rejects self-service premium, then migrates after administrator assignment
 
 		await admin.collection('users').update(createdUserId, { is_premium: true });
 		await page.reload();
-		await page.getByRole('button', { name: 'Account and cloud storage' }).click();
-		await expect(page.getByText('Cloud saving is on')).toBeVisible();
-		await page.getByRole('button', { name: 'Move local novels to cloud' }).click();
-		await expect(page.getByText('Your local novels are now available in the cloud.')).toBeVisible();
+		await page.getByRole('button', { name: 'Your account and saving' }).click();
+		await expect(page.getByText('Your novels are backed up')).toBeVisible();
 
 		const cloudContext = await browser.newContext({
 			baseURL: new URL(page.url()).origin,
@@ -81,8 +78,8 @@ test('rejects self-service premium, then migrates after administrator assignment
 		try {
 			const cloudPage = await cloudContext.newPage();
 			await cloudPage.goto('/app');
-			await expect(cloudPage.getByText('0 projects')).toBeVisible();
-			await cloudPage.getByRole('button', { name: 'Premium' }).click();
+			await expect(cloudPage.getByText('0 novels')).toBeVisible();
+			await cloudPage.getByRole('button', { name: 'Account' }).click();
 			await cloudPage.getByLabel('Email').fill(email);
 			await cloudPage.getByLabel('Password').fill(password);
 			await cloudPage.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -91,19 +88,21 @@ test('rejects self-service premium, then migrates after administrator assignment
 			await expect(cloudPage.locator('.writing-surface')).toContainText(
 				'This manuscript began as a free local novel.'
 			);
-			await expect(cloudPage.getByLabel('Typeset page heading')).toContainText('Act 1');
+			await expect(cloudPage.getByLabel('Book page heading')).toContainText('Act 1');
 			await cloudPage.getByRole('button', { name: 'Book settings' }).click();
 			await expect(cloudPage.getByLabel('Restart page numbering at')).toHaveValue('3');
 			await expect(cloudPage.getByLabel('Page number style')).toHaveValue('roman');
 			await expect(cloudPage.getByLabel('Page number position')).toHaveValue('bottom-center');
-			await expect(cloudPage.getByLabel('Page number text')).toHaveValue('Cloud {number}');
+			await expect(cloudPage.getByLabel('How page numbers look')).toHaveValue('Cloud #');
 			await cloudPage.getByRole('button', { name: 'Save book settings' }).click();
 			await cloudPage.getByRole('button', { name: 'Chapter heading' }).click();
 			await expect(
-				cloudPage.getByRole('checkbox', { name: /Use book-wide heading style/ })
+				cloudPage.getByRole('checkbox', { name: /Use the same heading as other chapters/ })
 			).not.toBeChecked();
-			await cloudPage.getByRole('checkbox', { name: /Use book-wide heading style/ }).check();
-			await expect(cloudPage.getByLabel('Chapter heading preview')).toContainText('Part 1');
+			await cloudPage
+				.getByRole('checkbox', { name: /Use the same heading as other chapters/ })
+				.check();
+			await expect(cloudPage.getByLabel('Chapter heading example')).toContainText('Part 1');
 		} finally {
 			await cloudContext.close();
 		}

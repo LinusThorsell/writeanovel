@@ -28,7 +28,7 @@ describe('media service', () => {
 			{ type: 'image/svg+xml' }
 		);
 
-		await expect(createMediaAsset('project-1', file)).rejects.toThrow('not allowed');
+		await expect(createMediaAsset('project-1', file)).rejects.toThrow('cannot use');
 	});
 
 	it('hydrates object URLs for editing and strips them before persistence', () => {

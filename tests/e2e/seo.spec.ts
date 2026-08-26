@@ -17,8 +17,8 @@ const publicPages = [
 	{
 		path: '/offline-novel-writing',
 		title: 'Offline Novel Writing App That Saves Locally | WriteANovel',
-		heading: 'An offline novel writing app that keeps free drafts local',
-		serverText: 'An offline novel writing app that keeps free drafts local'
+		heading: 'An offline writing studio that keeps your novels local',
+		serverText: 'An offline writing studio that keeps your novels local'
 	},
 	{
 		path: '/novel-planning',
@@ -28,9 +28,9 @@ const publicPages = [
 	},
 	{
 		path: '/book-typesetting',
-		title: 'Book Typesetting Software with PDF and EPUB Export | WriteANovel',
-		heading: 'WYSIWYG book typesetting software for novelists',
-		serverText: 'WYSIWYG book typesetting software for novelists'
+		title: 'Book Formatting Software with PDF and EPUB Export | WriteANovel',
+		heading: 'Book formatting made simple for novelists',
+		serverText: 'Book formatting made simple for novelists'
 	}
 ] as const;
 

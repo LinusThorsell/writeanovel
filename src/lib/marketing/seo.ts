@@ -31,19 +31,13 @@ export function homeStructuredData(description: string): JsonObject {
 				browserRequirements: 'Requires a modern web browser',
 				image: absoluteUrl(SOCIAL_IMAGE_PATH),
 				featureList: [
-					'Offline-first novel writing',
+					'Novel writing without internet',
 					'Automatic chapter numbering',
 					'Character, environment, plotline, and planning notes',
-					'WYSIWYG book typesetting',
-					'Raster image and SVG placement',
+					'Book formatting visible while writing',
+					'Image placement and resizing',
 					'PDF and EPUB export'
-				],
-				offers: {
-					'@type': 'Offer',
-					name: 'Free local writing mode',
-					price: '0',
-					priceCurrency: 'USD'
-				}
+				]
 			}
 		]
 	};

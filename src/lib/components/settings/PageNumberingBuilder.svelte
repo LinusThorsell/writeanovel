@@ -79,7 +79,12 @@
 	}
 
 	function updateTemplate(event: Event): void {
-		onChange({ ...value, template: (event.currentTarget as HTMLInputElement).value });
+		const template = (event.currentTarget as HTMLInputElement).value.replaceAll('#', '{number}');
+		onChange({ ...value, template });
+	}
+
+	function friendlyTemplate(template: string): string {
+		return template.replaceAll('{number}', '#');
 	}
 
 	function updatePlacement(event: Event): void {
@@ -134,9 +139,9 @@
 
 			<div class="two-fields sequence-fields">
 				<label class="field">
-					<span>Numbering sequence</span>
+					<span>Where counting begins</span>
 					<select
-						aria-label="Numbering sequence"
+						aria-label="Where page counting begins"
 						value={value.countMode}
 						onchange={updateCountMode}
 					>
@@ -166,8 +171,8 @@
 						value={value.numeralStyle}
 						onchange={updateNumeralStyle}
 					>
-						<option value="arabic">Arabic — 1, 2, 3</option>
-						<option value="roman">Roman — i, ii, iii</option>
+						<option value="arabic">1, 2, 3</option>
+						<option value="roman">i, ii, iii</option>
 					</select>
 				</label>
 				<label class="field">
@@ -187,14 +192,18 @@
 			</div>
 
 			<label class="field">
-				<span>Page number text</span>
-				<input aria-label="Page number text" value={value.template} oninput={updateTemplate} />
-				<small>Use <code>{'{number}'}</code> where the formatted number belongs.</small>
+				<span>How page numbers look</span>
+				<input
+					aria-label="How page numbers look"
+					value={friendlyTemplate(value.template)}
+					oninput={updateTemplate}
+				/>
+				<small>Use # where the number should appear, such as “Page #”.</small>
 			</label>
 		</div>
 
-		<div class="preview" aria-label="Page number preview">
-			<span>Preview</span>
+		<div class="preview" aria-label="Page number example">
+			<span>Example</span>
 			<div class="page">
 				<div class={['folio', previewAlignment]}>{previewText}</div>
 			</div>
@@ -276,13 +285,6 @@
 		background: white;
 		border: 1px solid var(--line);
 		border-radius: 0.45rem;
-	}
-
-	code {
-		padding: 0.05rem 0.2rem;
-		background: #e9e4db;
-		border-radius: 0.2rem;
-		font-size: 0.68rem;
 	}
 
 	.preview {

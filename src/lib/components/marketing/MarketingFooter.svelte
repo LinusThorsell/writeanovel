@@ -9,7 +9,7 @@
 			<span><Feather size={21} /></span>
 			<div>
 				<strong>WriteANovel</strong>
-				<p>A private-first place to plan, write, typeset, and finish a book.</p>
+				<p>A private place to plan, write, format, and finish a book.</p>
 			</div>
 		</div>
 		<div class="footer-links">
@@ -17,7 +17,7 @@
 				<strong>Explore</strong>
 				<a href={resolve('/features')}>Features</a>
 				<a href={resolve('/novel-planning')}>Novel planning</a>
-				<a href={resolve('/book-typesetting')}>Typesetting and export</a>
+				<a href={resolve('/book-typesetting')}>Book design and export</a>
 			</div>
 			<div>
 				<strong>Start</strong>
@@ -27,8 +27,8 @@
 		</div>
 	</div>
 	<div class="footer-bottom">
-		<span><HardDrive size={15} />Free drafts stay in your browser.</span>
-		<span><ShieldCheck size={15} />Cloud storage is an explicit premium choice.</span>
+		<span><HardDrive size={15} />Your writing stays on your device.</span>
+		<span><ShieldCheck size={15} />Saved automatically and private by default.</span>
 	</div>
 </footer>
 

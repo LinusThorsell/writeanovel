@@ -15,7 +15,7 @@
 		event.preventDefault();
 		error = undefined;
 		if (!token) {
-			error = 'This reset link is missing its security token.';
+			error = 'This password-change link is incomplete. Please request a new one.';
 			return;
 		}
 		if (password !== confirmation) {
@@ -27,9 +27,8 @@
 		try {
 			await accountService.confirmPasswordReset(token, password);
 			complete = true;
-		} catch (requestError) {
-			error =
-				requestError instanceof Error ? requestError.message : 'The password could not be reset.';
+		} catch {
+			error = 'The password could not be changed. Please request a new link and try again.';
 		} finally {
 			working = false;
 		}

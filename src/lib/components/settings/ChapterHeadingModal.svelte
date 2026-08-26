@@ -40,8 +40,8 @@
 		<label class="inherit-toggle">
 			<input type="checkbox" bind:checked={useBookDefaults} />
 			<span
-				><strong>Use book-wide heading style</strong><small
-					>Turn this off to make this chapter different.</small
+				><strong>Use the same heading as other chapters</strong><small
+					>Turn this off to give this chapter its own heading.</small
 				></span
 			>
 		</label>

@@ -12,9 +12,9 @@
 	onMount(() => {
 		const stopMonitoringServiceWorker = monitorServiceWorkerUpdates();
 
-		state.initialize().catch((error) => {
+		state.initialize().catch(() => {
 			state.loading = false;
-			state.showError(error instanceof Error ? error.message : 'WriteANovel could not start.');
+			state.showError('WriteANovel could not open. Please reload the page.');
 		});
 
 		return stopMonitoringServiceWorker;

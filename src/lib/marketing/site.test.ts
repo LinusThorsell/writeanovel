@@ -45,7 +45,8 @@ describe('marketing SEO content', () => {
 		const pageSchema = JSON.stringify(marketingPageStructuredData(featurePage));
 
 		expect(homeSchema).toContain('SoftwareApplication');
-		expect(homeSchema).toContain('Free local writing mode');
+		expect(homeSchema).toContain('Novel writing without internet');
+		expect(homeSchema).not.toContain('Offer');
 		expect(homeSchema).not.toContain('AggregateRating');
 		expect(pageSchema).toContain('BreadcrumbList');
 		expect(pageSchema).toContain(`${SITE_ORIGIN}/features`);

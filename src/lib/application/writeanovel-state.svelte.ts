@@ -85,7 +85,7 @@ export class WriteANovelState {
 		}
 
 		if (this.isPremium && navigator.onLine) {
-			await this.library.refreshFromCloud().catch(() => undefined);
+			await this.library.migrateLocalProjects().catch(() => undefined);
 		}
 
 		this.projects = await this.library.listProjects();
@@ -287,7 +287,9 @@ export class WriteANovelState {
 			)
 		};
 		this.showNotice(
-			chapterHeadingOverride ? 'Chapter heading override saved.' : 'Using the book heading style.'
+			chapterHeadingOverride
+				? 'This chapter now has its own heading.'
+				: 'Heading matched to the other chapters.'
 		);
 	}
 
@@ -422,7 +424,7 @@ export class WriteANovelState {
 		try {
 			this.user = await this.accounts.login(email, password);
 			this.library.configureUser(this.user);
-			if (this.isPremium) await this.library.refreshFromCloud();
+			if (this.isPremium) await this.library.migrateLocalProjects();
 			await this.reloadAfterCloudChange();
 			this.accountOpen = false;
 			this.showNotice(`Welcome back${this.user.displayName ? `, ${this.user.displayName}` : ''}.`);
@@ -447,28 +449,12 @@ export class WriteANovelState {
 		this.user = undefined;
 		this.library.configureUser(undefined);
 		this.accountOpen = false;
-		this.showNotice('Signed out. Your local books are still here.');
-	}
-
-	async migrateLocalLibrary(): Promise<void> {
-		this.working = true;
-		try {
-			await this.library.migrateLocalProjects();
-			await this.reloadAfterCloudChange();
-			this.showNotice('Your local novels are now available in the cloud.');
-		} finally {
-			this.working = false;
-		}
+		this.showNotice('Signed out. Your books are still on this device.');
 	}
 
 	async requestPasswordReset(email: string): Promise<void> {
 		await this.accounts.requestPasswordReset(email);
 		this.showNotice('If that account exists, a reset link has been sent.');
-	}
-
-	async syncNow(): Promise<void> {
-		await this.library.refreshFromCloud();
-		await this.reloadAfterCloudChange();
 	}
 
 	async export(format: 'pdf' | 'epub'): Promise<void> {

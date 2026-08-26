@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BookOpen, Cloud, CloudOff, Feather, HardDrive, Plus, UserRound } from '@lucide/svelte';
+	import { BookOpen, Cloud, Feather, HardDrive, Plus, UserRound } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import InstallApplicationButton from '$lib/components/application/InstallApplicationButton.svelte';
@@ -9,7 +9,6 @@
 	let creating = $state(false);
 	let title = $state('');
 	let author = $state('');
-	let online = $state(true);
 	let createError = $state<string>();
 
 	async function createNovel(event: SubmitEvent): Promise<void> {
@@ -34,8 +33,6 @@
 	}
 </script>
 
-<svelte:window ononline={() => (online = true)} onoffline={() => (online = false)} />
-
 <div class="library-page">
 	<header class="site-header">
 		<a class="brand" href={resolve('/')} aria-label="WriteANovel home"
@@ -43,13 +40,8 @@
 		>
 		<div class="header-actions">
 			<InstallApplicationButton />
-			<span class:offline={!online} class="connection"
-				>{#if online}<Cloud size={15} />Online{:else}<CloudOff size={15} />Offline{/if}</span
-			>
 			<button class="account-button" type="button" onclick={() => (model.accountOpen = true)}
-				><UserRound size={18} /><span
-					>{model.user ? model.user.displayName || 'Account' : 'Premium'}</span
-				>{#if model.isPremium}<i>Premium</i>{/if}</button
+				><UserRound size={18} /><span>{model.user?.displayName || 'Account'}</span></button
 			>
 		</div>
 	</header>
@@ -58,13 +50,13 @@
 		<section class="welcome">
 			<p class="eyebrow">Your writing desk</p>
 			<h1>Stories worth finishing.</h1>
-			<p>Write, plan, typeset, and export complete novels—even without an internet connection.</p>
+			<p>Write, plan, and shape complete novels—even when you are away from the internet.</p>
 		</section>
 
 		<div class="library-heading">
 			<div>
 				<h2>Your novels</h2>
-				<span>{model.projects.length} {model.projects.length === 1 ? 'project' : 'projects'}</span>
+				<span>{model.projects.length} {model.projects.length === 1 ? 'novel' : 'novels'}</span>
 			</div>
 			{#if model.projects.length > 0}
 				<button class="button button-primary" type="button" onclick={() => (creating = true)}
@@ -119,8 +111,8 @@
 	<footer class="privacy-note">
 		<HardDrive size={16} /><span
 			>{model.isPremium
-				? 'Cloud-backed with a complete offline cache.'
-				: 'Private by default. Free novels stay only in this browser.'}</span
+				? 'Your novels are safely backed up.'
+				: 'Your novels are private and saved on this device.'}</span
 		>
 	</footer>
 </div>
@@ -195,7 +187,6 @@
 	}
 
 	.header-actions,
-	.connection,
 	.account-button {
 		display: flex;
 		align-items: center;
@@ -203,16 +194,6 @@
 
 	.header-actions {
 		gap: 0.8rem;
-	}
-
-	.connection {
-		gap: 0.35rem;
-		color: #53705f;
-		font-size: 0.72rem;
-	}
-
-	.connection.offline {
-		color: #9a5d3f;
 	}
 
 	.account-button {
@@ -224,16 +205,6 @@
 		border-radius: 999px;
 		font-size: 0.76rem;
 		font-weight: 700;
-	}
-
-	.account-button i {
-		padding: 0.15rem 0.4rem;
-		color: #7f452c;
-		background: #f5dac8;
-		border-radius: 999px;
-		font-size: 0.57rem;
-		font-style: normal;
-		text-transform: uppercase;
 	}
 
 	main {
@@ -476,9 +447,7 @@
 				max(0.8rem, env(safe-area-inset-left));
 		}
 
-		.connection,
-		.account-button > span,
-		.account-button i {
+		.account-button > span {
 			display: none;
 		}
 

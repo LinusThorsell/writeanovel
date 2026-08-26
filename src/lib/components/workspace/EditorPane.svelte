@@ -66,15 +66,15 @@
 	function syncLabel(status: SyncStatus): string {
 		switch (status) {
 			case 'local':
-				return 'Saved on this device';
+				return 'Saved';
 			case 'offline':
-				return 'Offline — changes are safe';
+				return 'Saved here';
 			case 'syncing':
-				return 'Saving to cloud…';
+				return 'Saving…';
 			case 'synced':
-				return 'Saved to cloud';
+				return 'Saved';
 			case 'error':
-				return 'Cloud save will retry';
+				return 'Saved here — backup will retry';
 		}
 	}
 

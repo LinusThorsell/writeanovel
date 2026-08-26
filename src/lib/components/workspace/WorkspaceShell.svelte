@@ -93,12 +93,10 @@
 			if (requestId !== previewRequestId) return;
 			pdfPreview = preview;
 			pdfPreviewUrl = URL.createObjectURL(preview.blob);
-		} catch (error) {
+		} catch {
 			if (requestId !== previewRequestId) return;
 			pdfPreviewOpen = false;
-			model.showError(
-				error instanceof Error ? error.message : 'The PDF preview could not be created.'
-			);
+			model.showError('The book preview could not be prepared. Please try again.');
 		} finally {
 			if (requestId === previewRequestId) pdfPreviewLoading = false;
 		}
@@ -160,11 +158,11 @@
 				class="compact-status"
 				class:warning={model.syncStatus === 'error' || model.syncStatus === 'offline'}
 			>
-				{#if model.syncStatus === 'local'}Local only{:else if model.syncStatus === 'syncing'}<Cloud
+				{#if model.syncStatus === 'syncing'}<Cloud
 						size={14}
-					/>Syncing{:else if model.syncStatus === 'synced'}<Cloud size={14} />Synced{:else}<CloudOff
+					/>Saving…{:else if model.syncStatus === 'synced'}<Cloud size={14} />Saved{:else}<CloudOff
 						size={14}
-					/>Offline{/if}
+					/>Saved{/if}
 			</span>
 			<button class="toolbar-button" type="button" onclick={() => (model.settingsOpen = true)}
 				><Settings size={17} /><span>Book settings</span></button
@@ -179,7 +177,7 @@
 						disabled={model.exporting !== undefined}
 						onclick={() => exportBook('pdf')}
 						><FileText size={17} /><span
-							><strong>PDF</strong><small>Typeset, ready to print</small></span
+							><strong>PDF</strong><small>Ready to share or print</small></span
 						></button
 					>
 					<button
@@ -187,7 +185,7 @@
 						disabled={model.exporting !== undefined}
 						onclick={() => exportBook('epub')}
 						><Download size={17} /><span
-							><strong>EPUB</strong><small>For e-readers and stores</small></span
+							><strong>EPUB</strong><small>For reading apps and book stores</small></span
 						></button
 					>
 				</div>
@@ -195,7 +193,7 @@
 			<button
 				class="account-icon"
 				type="button"
-				aria-label="Account and cloud storage"
+				aria-label="Your account and saving"
 				onclick={() => (model.accountOpen = true)}
 				><UserRound size={18} />{#if model.isPremium}<i></i>{/if}</button
 			>

@@ -17,23 +17,23 @@ const forbiddenSvgElements = new Set(['script', 'foreignObject', 'iframe', 'obje
 function validateSvg(svgText: string): void {
 	const document = new DOMParser().parseFromString(svgText, 'image/svg+xml');
 	if (document.querySelector('parsererror') || document.documentElement.localName !== 'svg') {
-		throw new Error('That SVG file is not valid.');
+		throw new Error('That picture could not be read. Please choose another one.');
 	}
 
 	for (const element of Array.from(document.querySelectorAll('*'))) {
 		if (forbiddenSvgElements.has(element.localName)) {
-			throw new Error(`SVG elements named “${element.localName}” are not allowed.`);
+			throw new Error('That picture contains something WriteANovel cannot use.');
 		}
 		for (const attribute of Array.from(element.attributes)) {
 			const value = attribute.value.trim().toLowerCase();
 			if (attribute.name.toLowerCase().startsWith('on')) {
-				throw new Error('Interactive SVG event handlers are not allowed.');
+				throw new Error('That picture contains something WriteANovel cannot use.');
 			}
 			if (
 				(attribute.localName === 'href' || attribute.localName === 'src') &&
 				(value.startsWith('http:') || value.startsWith('https:') || value.startsWith('//'))
 			) {
-				throw new Error('SVG files cannot load content from the internet.');
+				throw new Error('That picture depends on something outside the book. Choose another one.');
 			}
 		}
 	}
@@ -41,10 +41,10 @@ function validateSvg(svgText: string): void {
 
 export async function createMediaAsset(projectId: string, file: File): Promise<MediaAsset> {
 	if (!acceptedTypes.has(file.type)) {
-		throw new Error('Choose a JPG, PNG, WebP, GIF, or SVG image.');
+		throw new Error('Choose a supported picture.');
 	}
 	if (file.size > MAX_MEDIA_BYTES) {
-		throw new Error('Images must be smaller than 20 MB.');
+		throw new Error('That picture is too large. Choose one smaller than 20 MB.');
 	}
 	if (file.type === 'image/svg+xml') validateSvg(await file.text());
 

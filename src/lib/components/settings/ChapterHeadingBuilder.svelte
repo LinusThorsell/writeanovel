@@ -25,7 +25,12 @@
 	}
 
 	function updateTemplate(event: Event): void {
-		onChange({ ...value, labelTemplate: (event.currentTarget as HTMLInputElement).value });
+		const label = (event.currentTarget as HTMLInputElement).value.replaceAll('#', '{number}');
+		onChange({ ...value, labelTemplate: label });
+	}
+
+	function friendlyTemplate(template: string): string {
+		return template.replaceAll('{number}', '#');
 	}
 </script>
 
@@ -37,19 +42,18 @@
 				checked={value.showLabel}
 				onchange={(event) => toggle('showLabel', event)}
 			/>
-			<span
-				><strong>Automatic chapter label</strong><small>Renumbers when chapters move.</small></span
+			<span><strong>Show the chapter number</strong><small>Changes when chapters move.</small></span
 			>
 		</label>
 		<label class="field">
-			<span>Chapter label text</span>
+			<span>Chapter number wording</span>
 			<input
-				aria-label="Chapter label text"
-				value={value.labelTemplate}
+				aria-label="Chapter number wording"
+				value={friendlyTemplate(value.labelTemplate)}
 				disabled={disabled || !value.showLabel}
 				oninput={updateTemplate}
 			/>
-			<small>Use <code>{'{number}'}</code> where the chapter number belongs.</small>
+			<small>Use # where the number should appear, such as “Chapter #”.</small>
 		</label>
 		<label class="toggle">
 			<input
@@ -58,14 +62,15 @@
 				onchange={(event) => toggle('showTitle', event)}
 			/>
 			<span
-				><strong>Chapter title</strong><small>Uses the editable page title above the editor.</small
+				><strong>Show the chapter title</strong><small
+					>Uses the chapter name at the top of this page.</small
 				></span
 			>
 		</label>
 	</div>
 
-	<div class="preview" aria-label="Chapter heading preview">
-		<span>Preview</span>
+	<div class="preview" aria-label="Chapter heading example">
+		<span>Example</span>
 		{#if showPreviewLabel}<p>{previewLabel}</p>{/if}
 		{#if previewTitle}<h4>{previewTitle}</h4>{/if}
 		{#if !showPreviewLabel && !previewTitle}<em>No heading — the chapter begins with body text.</em
@@ -134,13 +139,6 @@
 		background: white;
 		border: 1px solid var(--line);
 		border-radius: 0.45rem;
-	}
-
-	code {
-		padding: 0.05rem 0.2rem;
-		background: #e9e4db;
-		border-radius: 0.2rem;
-		font-size: 0.68rem;
 	}
 
 	.preview {

@@ -37,13 +37,13 @@ export const marketingPages = [
 		slug: 'features',
 		title: 'Novel Writing Software Features | WriteANovel',
 		description:
-			'Plan, draft, organize, typeset, illustrate, and export complete books with private, offline-first novel writing software built for long projects.',
+			'Plan, draft, organize, format, illustrate, and export complete books with private novel writing software that works without internet.',
 		eyebrow: 'A complete writing studio',
 		heading: 'Novel writing software that follows the whole book',
 		introduction:
 			'WriteANovel keeps drafting, story planning, page design, and export in one calm workspace. Start without an account, arrange a manuscript without renaming files, and shape a finished book without rebuilding it in another tool.',
 		highlights: [
-			'WYSIWYG manuscript editor',
+			'Writing and formatting in one place',
 			'Automatic chapter numbering',
 			'Characters, places, plotlines, and plans',
 			'PDF and EPUB export'
@@ -81,23 +81,22 @@ export const marketingPages = [
 			},
 			{
 				eyebrow: 'Finish as a book',
-				heading: 'Typeset once, then export PDF and EPUB',
+				heading: 'Format once, then export PDF and EPUB',
 				paragraphs: [
-					'Choose a trim-size and typography preset, add front and back covers, and place raster images or SVG artwork inside the manuscript. Artwork can be aligned and resized directly in the writing surface.',
-					'When the draft is ready, download a typeset PDF for review or print and an EPUB 3 file for e-readers. The exporter carries book pages, chapters, covers, and artwork into the finished files.'
+					'Choose a finished book size and reading style, add front and back covers, and place images inside the manuscript. Artwork can be aligned and resized while you write.',
+					'When the draft is ready, download a PDF for review or print and an EPUB for reading apps. Book pages, chapters, covers, and artwork all carry into the finished files.'
 				]
 			}
 		],
 		faq: [
 			{
 				question: 'Can I use WriteANovel without creating an account?',
-				answer:
-					'Yes. Free writing starts immediately and saves novels in the browser on your device.'
+				answer: 'Yes. Start immediately and your novels are saved on this device.'
 			},
 			{
 				question: 'Does it support more than plain chapter text?',
 				answer:
-					'Yes. You can create front and back matter, add covers, and position raster images or SVG artwork in the manuscript.'
+					'Yes. You can create opening and closing book pages, add covers, and place or resize images in the manuscript.'
 			}
 		],
 		relatedSlugs: ['offline-novel-writing', 'novel-planning', 'book-typesetting']
@@ -106,67 +105,65 @@ export const marketingPages = [
 		slug: 'offline-novel-writing',
 		title: 'Offline Novel Writing App That Saves Locally | WriteANovel',
 		description:
-			'Write novels offline in a private, local-first browser editor. No account is required, and free manuscripts never need to reach the database.',
+			'Write novels without an internet connection in a private writing studio that saves automatically on your device. No account is required.',
 		eyebrow: 'Private-first by design',
-		heading: 'An offline novel writing app that keeps free drafts local',
+		heading: 'An offline writing studio that keeps your novels local',
 		introduction:
-			'WriteANovel is built for the train, the cabin, the unreliable connection, and the writer who simply does not want every unfinished sentence sent to a server. The free writing path stores projects in your browser and does not require registration.',
+			'WriteANovel is built for the train, the cabin, and any place with an unreliable connection. Your novels are saved automatically on this device, and you can begin without creating an account.',
 		highlights: [
 			'No account required',
-			'Browser-local manuscript storage',
-			'Installable offline writing studio',
-			'Explicit cloud migration for premium'
+			'Saved automatically on your device',
+			'Works without internet',
+			'Private by default'
 		],
 		sections: [
 			{
-				eyebrow: 'Local-first, not local-limited',
+				eyebrow: 'Local and dependable',
 				heading: 'Keep writing when the connection disappears',
 				paragraphs: [
-					'After the app is installed or loaded once, its writing interface remains available without a network connection. Projects, chapters, notes, settings, and imported artwork are stored in IndexedDB, the browser database intended for substantial offline data.',
-					'The result feels like a desktop writing tool while remaining available from a modern browser. There is no save-folder setup and no technical database interface for the writer to understand.'
+					'Open WriteANovel once while connected, and the writing studio stays ready when the internet is unavailable. Your novels, notes, book settings, and artwork remain close at hand.',
+					'There is nothing extra to set up. Open your novel and keep writing wherever you are.'
 				],
 				points: [
 					{
-						title: 'Automatic local saving',
-						text: 'Edits are persisted behind the interface instead of adding save logic to every screen.'
+						title: 'Automatic saving',
+						text: 'Your latest changes are saved as you write.'
 					},
 					{
-						title: 'Offline application shell',
-						text: 'The editor and its required assets are cached for continued writing.'
+						title: 'Ready anywhere',
+						text: 'Keep writing even when the internet is unavailable.'
 					},
 					{
-						title: 'No free-user manuscript traffic',
-						text: 'Anonymous drafting does not call the PocketBase manuscript API.'
+						title: 'Private by default',
+						text: 'Your writing stays on this device unless you choose to download or share it.'
 					}
 				]
 			},
 			{
-				eyebrow: 'Your choice',
-				heading: 'Cloud storage begins with an explicit decision',
+				eyebrow: 'Safe by default',
+				heading: 'Your writing stays on your device',
 				paragraphs: [
-					'Premium writers can register with email and password, then deliberately move their local library to cloud-backed storage. PocketBase becomes authoritative only after that migration is confirmed.',
-					'A complete local cache remains on the device for offline work. When connectivity returns, queued changes synchronize without making the offline editor feel like a second-class mode.'
+					'Your novels are saved automatically while you work. You do not need an account to start, and your writing stays private.',
+					'Download a PDF or EPUB whenever you want an extra copy to keep or share.'
 				]
 			},
 			{
 				eyebrow: 'Practical privacy',
 				heading: 'A private offline novel editor with understandable boundaries',
 				paragraphs: [
-					'“Local” has a concrete meaning here: a free manuscript remains in that browser profile unless you export it or choose premium migration. Clearing browser storage can remove local work, so regular PDF or EPUB exports are sensible backups.',
-					'That honest boundary gives writers control without pretending a browser can protect data that the device owner deletes. The interface explains where work is stored instead of hiding the distinction.'
+					'“Local” means your novel is saved on this device. It does not leave the device unless you choose to download or share it.',
+					'Removing the saved information from this device can also remove your novel, so downloading a PDF or EPUB from time to time is a sensible extra backup.'
 				]
 			}
 		],
 		faq: [
 			{
 				question: 'Can I write with airplane mode enabled?',
-				answer:
-					'Yes, once the application has been loaded and its service worker installed on that device.'
+				answer: 'Yes. Open WriteANovel once while connected, then keep writing without internet.'
 			},
 			{
-				question: 'Do free manuscripts get uploaded?',
-				answer:
-					'No. The free path stores manuscript data locally and does not use the backend manuscript API.'
+				question: 'Does writing without an account leave my device?',
+				answer: 'No. It stays on this device unless you choose to download or share it.'
 			}
 		],
 		relatedSlugs: ['features', 'novel-planning', 'book-typesetting']
@@ -214,7 +211,7 @@ export const marketingPages = [
 				heading: 'Characters, environments, and plotlines have clear homes',
 				paragraphs: [
 					'Create a profile for a protagonist, a location note for an invented city, or a page that tracks the promise and payoff of a plotline. General planning pages can hold research, timelines, themes, or revision checklists.',
-					'These categories are visible in the manuscript sidebar beneath the chapters. A writer does not need to understand folders, databases, tags, or schemas before capturing an important detail.'
+					'These categories are visible beside the chapters. A writer can capture an important detail without setting up a complicated filing system.'
 				]
 			},
 			{
@@ -242,69 +239,67 @@ export const marketingPages = [
 	},
 	{
 		slug: 'book-typesetting',
-		title: 'Book Typesetting Software with PDF and EPUB Export | WriteANovel',
+		title: 'Book Formatting Software with PDF and EPUB Export | WriteANovel',
 		description:
-			'Turn a novel draft into a readable book with WYSIWYG typesetting, trim and typography presets, artwork, covers, PDF, and EPUB export.',
-		eyebrow: 'Draft to designed book',
-		heading: 'WYSIWYG book typesetting software for novelists',
+			'Turn a novel draft into a readable book with guided choices for page size, reading style, artwork, covers, and direct PDF and EPUB downloads.',
+		eyebrow: 'Draft to finished book',
+		heading: 'Book formatting made simple for novelists',
 		introduction:
-			'WriteANovel treats formatting as part of a clear publishing workflow. Writers can compose visually, choose sensible book presets, add pages and artwork, then download PDF and EPUB files directly from the same project.',
+			'WriteANovel keeps book formatting inside the writing process. Choose how the book looks, add pages and artwork, then download PDF and EPUB files directly from the same novel.',
 		highlights: [
-			'6 × 9 inch and A5 trim presets',
-			'Libre Baskerville book typography',
-			'Raster image and SVG placement',
-			'Direct PDF and EPUB 3 downloads'
+			'Common finished book sizes',
+			'Coordinated reading styles',
+			'Images you can place and resize',
+			'Direct PDF and EPUB downloads'
 		],
 		sections: [
 			{
 				eyebrow: 'Readable by default',
-				heading: 'Typesetting choices begin with useful presets',
+				heading: 'Start with sensible choices',
 				paragraphs: [
-					'The default 6 × 9 inch trim and Libre Baskerville typography give a novel an intentional starting point. Additional trim and type presets let a writer change the feel without learning CSS, LaTeX, or professional layout terminology.',
-					'Headings, paragraphs, quotations, emphasis, lists, and alignment remain visible in the WYSIWYG editor. The goal is the typographic care associated with typesetting systems, presented through controls a nontechnical writer can use.'
+					'Start with a common finished book size and a carefully matched reading style. Change either choice whenever you want a different feel for the book.',
+					'Headings, paragraphs, quotations, emphasis, lists, and alignment stay visible while you write, so the result never depends on hidden instructions.'
 				],
 				points: [
 					{
-						title: 'Trim presets',
-						text: 'Choose a practical finished-page size without entering measurements.'
+						title: 'Book sizes',
+						text: 'Choose a practical finished-page size from a short list.'
 					},
 					{
-						title: 'Typography presets',
+						title: 'Reading styles',
 						text: 'Apply a coordinated reading style instead of formatting every paragraph.'
 					},
 					{
-						title: 'Book metadata',
-						text: 'Keep title, subtitle, author, language, and identifier details with the project.'
+						title: 'Book details',
+						text: 'Keep the title, subtitle, author, language, and book number with the novel.'
 					}
 				]
 			},
 			{
 				eyebrow: 'Illustrated when the story needs it',
-				heading: 'Place and resize images or vector artwork visually',
+				heading: 'Place and resize images while you write',
 				paragraphs: [
-					'Upload common raster formats for photographs and illustrations or use SVG files for maps, ornaments, and other vector artwork. Select an image in the editor to align it and drag its handles to the right size.',
-					'Front and back covers are chosen separately from inline artwork. That distinction makes the book setup obvious and preserves the correct role for each asset during export.'
+					'Add photographs, illustrations, maps, or ornaments to the manuscript. Select an image to align it and drag its handles to the right size.',
+					'Choose front and back covers separately from the images inside the book, so each one lands in the right place when you export.'
 				]
 			},
 			{
 				eyebrow: 'Files you can take elsewhere',
-				heading: 'Download PDF for fixed pages and EPUB for reflowable reading',
+				heading: 'Download PDF for finished pages and EPUB for reading apps',
 				paragraphs: [
-					'PDF export creates a downloadable, typeset file rather than sending the writer through a browser print dialog. It is suited to proofreading, sharing a fixed layout, and preparing a print-oriented copy.',
-					'EPUB 3 export packages the reading order, chapters, book pages, covers, and media for e-readers and downstream publishing tools. Both formats leave the browser as ordinary files the writer controls.'
+					'PDF keeps the finished page design in a file suited to proofreading, sharing, and printing.',
+					'EPUB keeps the reading order, chapters, book pages, covers, and images ready for reading apps and book stores. Both files belong to you.'
 				]
 			}
 		],
 		faq: [
 			{
 				question: 'Does PDF export download an actual PDF file?',
-				answer:
-					'Yes. WriteANovel generates and downloads a PDF directly instead of relying on the browser print dialog.'
+				answer: 'Yes. WriteANovel creates and downloads the PDF directly.'
 			},
 			{
-				question: 'Can I use SVG artwork as well as normal images?',
-				answer:
-					'Yes. Raster images and SVG artwork can be uploaded, positioned, and resized without an in-app drawing tool.'
+				question: 'Can I add artwork as well as normal images?',
+				answer: 'Yes. Images and artwork can be added, positioned, and resized while you write.'
 			}
 		],
 		relatedSlugs: ['features', 'offline-novel-writing', 'novel-planning']

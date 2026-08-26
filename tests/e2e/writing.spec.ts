@@ -163,7 +163,7 @@ test('anchors comment threads to edited manuscript text and persists replies', a
 	await page.waitForTimeout(350);
 
 	page.once('dialog', (dialog) => dialog.accept());
-	await page.getByRole('button', { name: 'Delete entire thread on: quay' }).click();
+	await page.getByRole('button', { name: 'Delete conversation about: quay' }).click();
 	await expect(anchor).toHaveCount(0);
 	await expect(editor).toContainText('At dusk, The quay bells');
 	await expect(page.getByText('No comments yet.')).toBeVisible();
@@ -179,16 +179,16 @@ test('expands the manuscript into distraction-free writing mode', async ({ page 
 	const paper = page.locator('.paper');
 	const standardWidth = await paper.evaluate((element) => element.getBoundingClientRect().width);
 
-	await page.getByRole('button', { name: 'Enter distraction-free mode' }).click();
+	await page.getByRole('button', { name: 'Start focus mode' }).click();
 	await expect(page.locator('.workspace-page')).toHaveClass(/distraction-free/);
 	await expect(page.locator('.topbar')).toBeHidden();
 	await expect(page.locator('.sidebar')).toBeHidden();
 	await expect(page.locator('.item-header')).toBeHidden();
 	await expect(page.locator('.status-bar')).toBeHidden();
-	await expect(page.getByRole('button', { name: 'Exit distraction-free mode' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Leave focus mode' })).toBeVisible();
 	const focusedWidth = await paper.evaluate((element) => element.getBoundingClientRect().width);
 	expect(focusedWidth).toBeGreaterThan(standardWidth);
-	const focusTitle = page.getByLabel('Page title in distraction-free mode');
+	const focusTitle = page.getByLabel('Page title in focus mode');
 	await expect(focusTitle).toHaveValue('Chapter 1');
 	const titleCenterOffset = await focusTitle.evaluate((element) => {
 		const bounds = element.getBoundingClientRect();
@@ -266,14 +266,14 @@ test('expands the manuscript into distraction-free writing mode', async ({ page 
 		page.getByRole('button', { name: 'Open focus navigation, current item: Opening Scene' })
 	).toBeVisible();
 
-	await page.getByRole('button', { name: 'Exit distraction-free mode' }).click();
+	await page.getByRole('button', { name: 'Leave focus mode' }).click();
 	await expect(page.locator('.workspace-page')).not.toHaveClass(/distraction-free/);
 	await expect(page.locator('.topbar')).toBeVisible();
 	await expect(page.getByLabel('Page title')).toHaveValue('Opening Scene');
 	await page.reload();
 	await expect(page.getByLabel('Page title')).toHaveValue('Opening Scene');
 
-	await page.getByRole('button', { name: 'Enter distraction-free mode' }).click();
+	await page.getByRole('button', { name: 'Start focus mode' }).click();
 	await page.keyboard.press('Escape');
 	await expect(page.locator('.workspace-page')).not.toHaveClass(/distraction-free/);
 });
@@ -281,7 +281,7 @@ test('expands the manuscript into distraction-free writing mode', async ({ page 
 test('uses the full phone width and safe areas in distraction-free mode', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await createNovel(page, 'Pocket Story');
-	await page.getByRole('button', { name: 'Enter distraction-free mode' }).click();
+	await page.getByRole('button', { name: 'Start focus mode' }).click();
 
 	const workspace = page.locator('.workspace-page');
 	await workspace.evaluate((element) => {
@@ -481,7 +481,7 @@ test('uses writing flow by default and previews the PDF at the visible text', as
 
 	await expect(page.getByRole('switch', { name: 'Book formatting' })).toHaveCount(0);
 	await expect(page.locator('.editor-shell')).toHaveClass(/writing-view/);
-	await expect(page.getByLabel('Typeset page heading')).toBeVisible();
+	await expect(page.getByLabel('Book page heading')).toBeVisible();
 
 	const writingPresentation = await page.evaluate(() => {
 		const paper = document.querySelector<HTMLElement>('.paper');
@@ -519,12 +519,14 @@ test('uses writing flow by default and previews the PDF at the visible text', as
 	await expect
 		.poll(() => editorArea.evaluate((element) => element.scrollTop))
 		.toBeGreaterThan(1_000);
-	await page.getByRole('button', { name: 'Preview book PDF' }).click();
+	await page.getByRole('button', { name: 'Preview finished book' }).click();
 
-	const previewDialog = page.getByRole('dialog', { name: 'PDF preview' });
+	const previewDialog = page.getByRole('dialog', { name: 'Book preview' });
 	await expect(previewDialog).toBeVisible();
-	await expect(previewDialog).toContainText('aligned to the text in view', { timeout: 30_000 });
-	const previewFrame = previewDialog.getByTitle('Rendered PDF preview');
+	await expect(previewDialog).toContainText('showing the passage you were reading', {
+		timeout: 30_000
+	});
+	const previewFrame = previewDialog.getByTitle('Finished book pages');
 	await expect(previewFrame).toHaveAttribute('src', /#page=/, { timeout: 30_000 });
 	const previewSource = await previewFrame.getAttribute('src');
 	if (!previewSource) throw new Error('The rendered PDF preview did not have a source.');
@@ -559,7 +561,7 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	await page.locator('.writing-surface').press('Control+Shift+E');
 	await page.waitForTimeout(700);
 
-	const typesetHeading = page.getByLabel('Typeset page heading');
+	const typesetHeading = page.getByLabel('Book page heading');
 	await expect(typesetHeading).toContainText('Chapter 1');
 	await expect(typesetHeading).toContainText('The Lantern Room');
 	const editorWritingFlowMatches = await page.evaluate(() => {
@@ -630,7 +632,7 @@ test('exports direct PDF and EPUB downloads', async ({ page }) => {
 	expect((await epubDownload).suggestedFilename()).toBe('exportable-story.epub');
 
 	await page.getByRole('button', { name: 'Book settings' }).click();
-	await page.getByLabel('Typography').selectOption('modern');
+	await page.getByLabel('Reading style').selectOption('modern');
 	await page.getByRole('button', { name: 'Save book settings' }).click();
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 	await page.getByText('Export', { exact: true }).click();
@@ -676,12 +678,12 @@ test('configures a visible document range, sequence, numeral style, template, an
 	await page.getByRole('button', { name: 'Book settings' }).click();
 	await page.getByLabel('Start numbering at').selectOption({ label: 'Chapter 1 — The Opening' });
 	await page.getByLabel('Stop numbering after').selectOption({ label: 'Chapter 2 — The Crossing' });
-	await page.getByLabel('Numbering sequence').selectOption('restart');
+	await page.getByLabel('Where page counting begins').selectOption('restart');
 	await page.getByLabel('Restart page numbering at').fill('7');
 	await page.getByLabel('Page number style').selectOption('roman');
 	await page.getByLabel('Page number position').selectOption('bottom-center');
-	await page.getByLabel('Page number text').fill('Folio {number}');
-	await expect(page.getByLabel('Page number preview')).toContainText('Folio vii');
+	await page.getByLabel('How page numbers look').fill('Folio #');
+	await expect(page.getByLabel('Page number example')).toContainText('Folio vii');
 	await page.getByRole('button', { name: 'Save book settings' }).click();
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 
@@ -696,7 +698,7 @@ test('configures a visible document range, sequence, numeral style, template, an
 	await expect(page.getByLabel('Restart page numbering at')).toHaveValue('7');
 	await expect(page.getByLabel('Page number style')).toHaveValue('roman');
 	await expect(page.getByLabel('Page number position')).toHaveValue('bottom-center');
-	await expect(page.getByLabel('Page number text')).toHaveValue('Folio {number}');
+	await expect(page.getByLabel('How page numbers look')).toHaveValue('Folio #');
 	await page.getByRole('button', { name: 'Save book settings' }).click();
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 
@@ -727,25 +729,25 @@ test('uses book-wide chapter headings with persistent per-chapter overrides in t
 	await page.getByLabel('Page title').press('Enter');
 
 	await page.getByRole('button', { name: 'Book settings' }).click();
-	await page.getByLabel('Chapter label text').fill('Scene {number}');
-	await page.getByRole('checkbox', { name: /Chapter title/ }).uncheck();
-	await expect(page.getByLabel('Chapter heading preview')).toContainText('Scene 1');
+	await page.getByLabel('Chapter number wording').fill('Scene #');
+	await page.getByRole('checkbox', { name: 'Show the chapter title' }).uncheck();
+	await expect(page.getByLabel('Chapter heading example')).toContainText('Scene 1');
 	await page.getByRole('button', { name: 'Save book settings' }).click();
-	await expect(page.getByLabel('Typeset page heading')).toContainText('Scene 1');
-	await expect(page.getByLabel('Typeset page heading')).not.toContainText('The Threshold');
+	await expect(page.getByLabel('Book page heading')).toContainText('Scene 1');
+	await expect(page.getByLabel('Book page heading')).not.toContainText('The Threshold');
 
 	await page.getByRole('button', { name: 'Insert chapter after The Threshold' }).click();
 	await page.getByRole('button', { name: 'Chapter heading' }).click();
-	await page.getByRole('checkbox', { name: /Use book-wide heading style/ }).uncheck();
-	await page.getByRole('checkbox', { name: /Automatic chapter label/ }).uncheck();
+	await page.getByRole('checkbox', { name: /Use the same heading as other chapters/ }).uncheck();
+	await page.getByRole('checkbox', { name: /Show the chapter number/ }).uncheck();
 	await page.getByRole('button', { name: 'Save chapter heading' }).click();
-	await expect(page.getByLabel('Typeset page heading')).toHaveCount(0);
+	await expect(page.getByLabel('Book page heading')).toHaveCount(0);
 
 	await page.reload();
 	await expect(page.getByLabel('Page title')).toHaveValue('Chapter 2');
-	await expect(page.getByLabel('Typeset page heading')).toHaveCount(0);
+	await expect(page.getByLabel('Book page heading')).toHaveCount(0);
 	await page.getByRole('button', { name: /1 The Threshold/ }).click();
-	await expect(page.getByLabel('Typeset page heading')).toContainText('Scene 1');
+	await expect(page.getByLabel('Book page heading')).toContainText('Scene 1');
 
 	await page.getByText('Export', { exact: true }).click();
 	const pdfDownload = page.waitForEvent('download');
@@ -778,8 +780,8 @@ test('configures book pages, raster and SVG covers, and positioned resizable art
 
 	await page.getByRole('button', { name: 'Book settings' }).click();
 	await page.getByLabel('Subtitle').fill('A cartographer’s tale');
-	await page.getByLabel('Trim size').selectOption('a5');
-	await page.getByLabel('Typography').selectOption('modern');
+	await page.getByLabel('Book size').selectOption('a5');
+	await page.getByLabel('Reading style').selectOption('modern');
 	const frontCover = page.locator('.cover-card').filter({ hasText: 'Front cover' });
 	await frontCover.locator('input[type=file]').setInputFiles({
 		name: 'front-cover.png',

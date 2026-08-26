@@ -477,7 +477,7 @@
 	function deleteThread(thread: CommentThread): void {
 		const messageCount = thread.messages.length;
 		const confirmed = window.confirm(
-			`Delete this entire comment thread? The manuscript text will stay, but the highlight and ${messageCount} ${messageCount === 1 ? 'comment' : 'comments'} will be removed.`
+			`Delete this conversation? Your writing will stay, but the highlight and ${messageCount} ${messageCount === 1 ? 'comment' : 'comments'} will be removed.`
 		);
 		if (confirmed) removeThread(thread.id);
 	}
@@ -486,7 +486,7 @@
 		const onlyMessage = thread.messages.length === 1;
 		const confirmed = window.confirm(
 			onlyMessage
-				? 'Delete this comment? It is the only comment in the thread, so the highlight and thread will also be removed.'
+				? 'Delete this comment? It is the only one here, so the highlight will also be removed.'
 				: 'Delete this comment? This cannot be undone.'
 		);
 		if (!confirmed || !editor) return;
@@ -658,19 +658,19 @@
 		try {
 			await persistEditorSnapshot(editor);
 			await onPreviewPdf(anchorText);
-		} catch (error) {
-			onError(error instanceof Error ? error.message : 'The PDF preview could not be created.');
+		} catch {
+			onError('The book preview could not be prepared. Please try again.');
 		}
 	}
 </script>
 
 <div class="editor-shell writing-view" class:distraction-free={distractionFree}>
 	{#if distractionFree}
-		<div class="focus-topbar" aria-label="Distraction-free writing controls">
+		<div class="focus-topbar" aria-label="Focus mode controls">
 			<div class="focus-navigation-slot">{@render focusNavigation()}</div>
 			<input
 				class="focus-title"
-				aria-label="Page title in distraction-free mode"
+				aria-label="Page title in focus mode"
 				value={itemTitle}
 				onblur={commitFocusTitle}
 				onkeydown={blurFocusTitleOnEnter}
@@ -678,14 +678,14 @@
 			<button
 				type="button"
 				class="focus-exit-button"
-				aria-label="Exit distraction-free mode"
-				title="Exit distraction-free mode"
+				aria-label="Leave focus mode"
+				title="Leave focus mode"
 				onclick={onToggleDistractionFree}><Minimize2 size={18} /></button
 			>
 		</div>
 	{/if}
 
-	<div class="toolbar" aria-label="Text formatting">
+	<div class="toolbar" aria-label="Writing tools">
 		<select
 			class="block-select"
 			aria-label="Text style"
@@ -693,9 +693,9 @@
 			onchange={applyBlock}
 		>
 			<option value="paragraph">Body text</option>
-			<option value="heading-1">Heading 1</option>
-			<option value="heading-2">Heading 2</option>
-			<option value="heading-3">Heading 3</option>
+			<option value="heading-1">Large heading</option>
+			<option value="heading-2">Medium heading</option>
+			<option value="heading-3">Small heading</option>
 		</select>
 		<span class="divider"></span>
 		<button
@@ -754,12 +754,12 @@
 		<button
 			type="button"
 			class:active={isActive('blockquote')}
-			aria-label="Block quote"
+			aria-label="Quotation"
 			aria-pressed={isActive('blockquote')}
 			onclick={() => editor?.chain().focus().toggleBlockquote().run()}><Quote size={18} /></button
 		>
 		<span class="divider"></span>
-		<button type="button" aria-label="Insert image or SVG" onclick={() => mediaInput?.click()}
+		<button type="button" aria-label="Add a picture" onclick={() => mediaInput?.click()}
 			><ImagePlus size={18} /></button
 		>
 		<input
@@ -791,8 +791,8 @@
 		<button
 			type="button"
 			class="preview-button"
-			aria-label="Preview book PDF"
-			title="Preview the exported PDF at the text in view"
+			aria-label="Preview finished book"
+			title="See how the finished book will look at this passage"
 			disabled={pdfPreviewLoading}
 			onclick={requestPdfPreview}
 		>
@@ -801,13 +801,13 @@
 			{:else}
 				<BookOpen size={17} />
 			{/if}
-			<span class="preview-button-label">Preview PDF</span>
+			<span class="preview-button-label">Preview book</span>
 		</button>
 		<span class="divider"></span>
 		{#if !distractionFree}
 			<button
 				type="button"
-				aria-label="Enter distraction-free mode"
+				aria-label="Start focus mode"
 				aria-pressed="false"
 				title="Write without distractions"
 				onclick={onToggleDistractionFree}><Maximize2 size={18} /></button
@@ -872,7 +872,7 @@
 					<div
 						class="typeset-document-heading"
 						class:chapter-heading={typesetHeading.kind === 'chapter'}
-						aria-label="Typeset page heading"
+						aria-label="Book page heading"
 						{@attach observeDocumentHeading}
 					>
 						{#if typesetHeading.label}
@@ -935,7 +935,7 @@
 					<div class="comments-empty">
 						<MessagesSquare size={24} />
 						<p>No comments yet.</p>
-						<small>Select text in the manuscript, then use the comment button.</small>
+						<small>Select some writing, then use the comment button.</small>
 					</div>
 				{:else}
 					<div class="comment-list">
@@ -958,8 +958,8 @@
 									<button
 										type="button"
 										class="delete-thread-button"
-										aria-label={`Delete entire thread on: ${threadQuote(thread)}`}
-										title="Delete entire thread"
+										aria-label={`Delete conversation about: ${threadQuote(thread)}`}
+										title="Delete conversation"
 										onclick={() => deleteThread(thread)}
 									>
 										<Trash2 size={14} />
@@ -995,7 +995,7 @@
 												id={`reply-${thread.id}`}
 												rows="2"
 												maxlength="2000"
-												placeholder="Add to this thread…"
+												placeholder="Write a reply…"
 												bind:value={replyText}></textarea>
 											<button type="submit" aria-label="Send reply" disabled={!replyText.trim()}
 												><Send size={16} /></button

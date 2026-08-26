@@ -74,7 +74,7 @@
 
 <Modal
 	title="Book settings"
-	description="Covers, publication details, and typesetting"
+	description="Covers, book details, and page design"
 	onClose={() => (model.settingsOpen = false)}
 	width="large"
 >
@@ -93,26 +93,26 @@
 			>
 			<div class="two-fields">
 				<label class="field">
-					<span>Trim size</span>
+					<span>Book size</span>
 					<select bind:value={trimSize}>
-						<option value="trade-6x9">Trade — 6 × 9 in</option>
-						<option value="a5">A5 — 148 × 210 mm</option>
-						<option value="letter">US Letter — 8.5 × 11 in</option>
+						<option value="trade-6x9">Paperback — 6 × 9 in</option>
+						<option value="a5">Compact — 148 × 210 mm</option>
+						<option value="letter">Large — 8.5 × 11 in</option>
 					</select>
 				</label>
 				<label class="field">
-					<span>Typography</span>
+					<span>Reading style</span>
 					<select bind:value={typography}>
-						<option value="literary">Literary — Libre Baskerville</option>
-						<option value="classic">Classic — traditional serif</option>
-						<option value="modern">Modern — clean sans serif</option>
+						<option value="literary">Literary — warm and bookish</option>
+						<option value="classic">Classic — timeless and traditional</option>
+						<option value="modern">Modern — simple and clean</option>
 					</select>
 				</label>
 			</div>
 			<div class="heading-settings">
 				<div>
-					<h3>Chapter heading defaults</h3>
-					<p>Applied to every chapter unless that chapter has its own override.</p>
+					<h3>Chapter headings</h3>
+					<p>Used for every chapter unless you choose something different for one.</p>
 				</div>
 				<ChapterHeadingBuilder
 					value={chapterHeading}
@@ -125,7 +125,7 @@
 
 		<section class="covers">
 			<h3>Front and back cover</h3>
-			<p class="muted">Upload a JPG, PNG, WebP, GIF, or SVG. Portrait artwork works best.</p>
+			<p class="muted">Choose a cover image. Portrait artwork works best.</p>
 			<div class="cover-pair">
 				{#each ['front', 'back'] as side (side)}
 					{@const coverSide = side === 'front' ? 'front' : 'back'}
@@ -175,7 +175,9 @@
 
 	<div class="danger-zone">
 		<div>
-			<strong>Delete this novel</strong><span>Removes the project, writing, notes, and media.</span>
+			<strong>Delete this novel</strong><span
+				>Removes the novel, its writing, notes, and pictures.</span
+			>
 		</div>
 		<button class="button button-danger" type="button" onclick={deleteBook}
 			><Trash2 size={17} />Delete novel</button

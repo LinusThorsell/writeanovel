@@ -54,22 +54,22 @@
 
 {#if installAvailable}
 	<button
-		aria-label="Install application"
+		aria-label="Add to home screen"
 		class:dark={variant === 'dark'}
 		class="install-button"
-		title="Install application"
+		title="Add to home screen"
 		type="button"
 		onclick={installApplication}
 	>
 		<Download size={17} />
-		<span>Install app</span>
+		<span>Add to home screen</span>
 	</button>
 {/if}
 
 {#if instructionsOpen}
 	<Modal
-		title="Install WriteANovel"
-		description="Keep your writing studio on your home screen and open it like an app."
+		title="Add WriteANovel to your home screen"
+		description="Open your writing desk with one tap."
 		onClose={() => (instructionsOpen = false)}
 		width="small"
 	>
@@ -82,8 +82,7 @@
 			{:else}
 				<div><Download size={22} /></div>
 				<p>
-					Open your browser menu, then choose <strong>Install app</strong> or
-					<strong>Add to Home screen</strong>.
+					Open the menu for this page, then choose <strong>Add to Home screen</strong>.
 				</p>
 			{/if}
 		</div>

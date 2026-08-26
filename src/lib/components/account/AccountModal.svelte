@@ -17,27 +17,15 @@
 			if (mode === 'login') await model.login(email, password);
 			if (mode === 'register') await model.register(email, password, displayName);
 			if (mode === 'forgot') await model.requestPasswordReset(email);
-		} catch (error) {
-			formError =
-				error instanceof Error ? error.message : 'The account request could not be completed.';
-		}
-	}
-
-	async function migrateLocalLibrary(): Promise<void> {
-		formError = undefined;
-		try {
-			await model.migrateLocalLibrary();
-		} catch (error) {
-			formError = error instanceof Error ? error.message : 'Local novels could not be moved.';
+		} catch {
+			formError = 'That did not work. Please check your details and try again.';
 		}
 	}
 </script>
 
 <Modal
-	title={model.user ? 'Your account' : 'Premium cloud account'}
-	description={model.user
-		? 'Manage where your novels are saved'
-		: 'Free writing stays entirely on this device'}
+	title="Your account"
+	description={model.user ? undefined : 'You can write for free without an account'}
 	onClose={() => (model.accountOpen = false)}
 >
 	{#if model.user}
@@ -48,7 +36,7 @@
 				<span>{model.user.email}</span>
 			</div>
 			<div class:premium={model.isPremium} class="plan-badge">
-				{model.isPremium ? 'Premium' : 'Free'}
+				{model.isPremium ? 'Backed up' : 'On this device'}
 			</div>
 		</div>
 
@@ -56,39 +44,17 @@
 			<div class="storage-card premium-storage">
 				<div class="storage-icon"><Cloud size={22} /></div>
 				<div>
-					<strong>Cloud saving is on</strong>
-					<p>PocketBase is authoritative and this device keeps a complete offline cache.</p>
+					<strong>Your novels are backed up</strong>
 				</div>
 				<Check size={20} />
-			</div>
-			<div class="account-actions">
-				<button
-					class="button button-primary"
-					type="button"
-					disabled={model.working}
-					onclick={migrateLocalLibrary}
-					>{model.working ? 'Moving…' : 'Move local novels to cloud'}</button
-				>
-				<button
-					class="button button-secondary"
-					type="button"
-					disabled={model.working}
-					onclick={() => model.syncNow()}>Sync now</button
-				>
 			</div>
 		{:else}
 			<div class="storage-card">
 				<div class="storage-icon local"><HardDrive size={22} /></div>
 				<div>
-					<strong>Local saving</strong>
-					<p>
-						Your novels stay in IndexedDB on this device and never contact the manuscript database.
-					</p>
+					<strong>Saved on this device</strong>
+					<p>Only this device can see these novels unless you choose to back them up.</p>
 				</div>
-			</div>
-			<div class="access-note">
-				<strong>Premium access is invite-only during this demo.</strong>
-				<p>Your novels remain local unless the site administrator enables cloud access.</p>
 			</div>
 		{/if}
 
@@ -165,7 +131,8 @@
 
 		<div class="free-reminder">
 			<HardDrive size={18} /><span
-				><strong>No account needed for free writing.</strong> Close this window and everything stays local.</span
+				><strong>No account needed for free writing.</strong> Close this window and everything stays on
+				this device.</span
 			>
 		</div>
 	{/if}
@@ -251,31 +218,6 @@
 	}
 
 	.storage-card p {
-		margin-top: 0.2rem;
-		color: var(--ink-soft);
-		font-size: 0.75rem;
-		line-height: 1.45;
-	}
-
-	.account-actions {
-		display: flex;
-		gap: 0.6rem;
-		margin-top: 1rem;
-	}
-
-	.access-note {
-		margin-top: 1rem;
-		padding: 0.85rem;
-		background: white;
-		border: 1px solid var(--line);
-		border-radius: 0.65rem;
-	}
-
-	.access-note strong {
-		font-size: 0.82rem;
-	}
-
-	.access-note p {
 		margin-top: 0.2rem;
 		color: var(--ink-soft);
 		font-size: 0.75rem;

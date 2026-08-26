@@ -14,9 +14,9 @@
 	let { preview, url, loading, onClose }: Props = $props();
 	const description = $derived(
 		loading
-			? 'Rendering the same PDF produced by export…'
+			? 'Preparing your book preview…'
 			: preview
-				? `Page ${preview.page} of ${preview.totalPages}${preview.matched ? ' — aligned to the text in view' : ''}`
+				? `Page ${preview.page} of ${preview.totalPages}${preview.matched ? ' — showing the passage you were reading' : ''}`
 				: undefined
 	);
 	const previewSource = $derived.by(() => {
@@ -42,24 +42,24 @@
 {#snippet footer()}
 	{#if url && preview}
 		<button class="secondary-button" type="button" onclick={openPreview}>
-			<ExternalLink size={16} /> Open in new tab
+			<ExternalLink size={16} /> Open separately
 		</button>
 		<button class="primary-button" type="button" onclick={downloadPreview}>
-			<Download size={16} /> Download PDF
+			<Download size={16} /> Save a copy
 		</button>
 	{/if}
 {/snippet}
 
-<Modal title="PDF preview" {description} {onClose} {footer} width="preview">
+<Modal title="Book preview" {description} {onClose} {footer} width="preview">
 	<div class="preview-frame">
 		{#if loading}
 			<div class="loading-preview" role="status">
 				<span><LoaderCircle size={28} /></span>
-				<strong>Typesetting your book…</strong>
-				<small>Large books and images may take a moment.</small>
+				<strong>Laying out your book…</strong>
+				<small>A long book may take a moment.</small>
 			</div>
 		{:else if previewSource}
-			<iframe title="Rendered PDF preview" src={previewSource}></iframe>
+			<iframe title="Finished book pages" src={previewSource}></iframe>
 		{/if}
 	</div>
 </Modal>
