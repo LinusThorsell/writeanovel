@@ -11,6 +11,7 @@
 		UserRound
 	} from '@lucide/svelte';
 	import type { Attachment } from 'svelte/attachments';
+	import { dev } from '$app/environment';
 	import type { WriteANovelState } from '$lib/application/writeanovel-state.svelte';
 	import InstallApplicationButton from '$lib/components/application/InstallApplicationButton.svelte';
 	import PdfPreviewModal from '$lib/components/editor/PdfPreviewModal.svelte';
@@ -129,7 +130,12 @@
 
 <svelte:document onfullscreenchange={handleFullscreenChange} onkeydown={handleKeydown} />
 
-<div class="workspace-page" class:distraction-free={distractionFree} {@attach captureWorkspace}>
+<div
+	class="workspace-page"
+	class:development={dev}
+	class:distraction-free={distractionFree}
+	{@attach captureWorkspace}
+>
 	<header class="topbar">
 		<div class="topbar-left">
 			<button
@@ -238,12 +244,17 @@
 		--safe-area-bottom: env(safe-area-inset-bottom);
 		--safe-area-left: env(safe-area-inset-left);
 		--topbar-height: calc(3.45rem + var(--safe-area-top));
+		--topbar-background: var(--forest-deep);
 		min-width: 0;
 		min-height: 0;
 		height: 100vh;
 		height: 100dvh;
 		overflow: hidden;
 		background: #e9e4db;
+	}
+
+	.workspace-page.development {
+		--topbar-background: #64272b;
 	}
 
 	.topbar {
@@ -254,7 +265,7 @@
 		gap: 1rem;
 		padding: var(--safe-area-top) max(0.7rem, var(--safe-area-right)) 0
 			max(0.7rem, var(--safe-area-left));
-		background: var(--forest-deep);
+		background: var(--topbar-background);
 		box-shadow: 0 1px 0 rgb(255 255 255 / 8%);
 		color: white;
 	}
@@ -344,7 +355,7 @@
 		width: 0.55rem;
 		height: 0.55rem;
 		background: #df9a6f;
-		border: 2px solid var(--forest-deep);
+		border: 2px solid var(--topbar-background);
 		border-radius: 50%;
 	}
 
