@@ -11,6 +11,7 @@ import type {
 	AuthenticatedUser,
 	ChapterHeadingSettings,
 	CommentThread,
+	CoverPosition,
 	PageNumberingSettings,
 	DocumentKind,
 	ManuscriptDocument,
@@ -393,6 +394,8 @@ export class WriteANovelState {
 		synopsis: string;
 		trimSize: TrimSize;
 		typography: TypographyPreset;
+		frontCoverPosition: CoverPosition;
+		backCoverPosition: CoverPosition;
 		chapterHeading: ChapterHeadingSettings;
 		pageNumbering: PageNumberingSettings;
 	}): Promise<void> {

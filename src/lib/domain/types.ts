@@ -45,6 +45,16 @@ export type MatterType =
 export type NoteKind = 'character' | 'environment' | 'plotline' | 'planning';
 export type TrimSize = 'trade-6x9' | 'a5' | 'letter';
 export type TypographyPreset = 'literary' | 'classic' | 'modern';
+export type CoverPosition =
+	| 'top-left'
+	| 'top-center'
+	| 'top-right'
+	| 'center-left'
+	| 'center'
+	| 'center-right'
+	| 'bottom-left'
+	| 'bottom-center'
+	| 'bottom-right';
 export type PageNumberCountMode = 'restart' | 'continue';
 export type PageNumberNumeralStyle = 'arabic' | 'roman';
 export type PageNumberPlacement =
@@ -80,6 +90,8 @@ export type NovelProject = {
 	pageNumbering?: PageNumberingSettings;
 	frontCoverAssetId?: string;
 	backCoverAssetId?: string;
+	frontCoverPosition?: CoverPosition;
+	backCoverPosition?: CoverPosition;
 	createdAt: string;
 	updatedAt: string;
 };

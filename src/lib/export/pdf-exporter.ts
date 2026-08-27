@@ -26,6 +26,7 @@ import {
 	pageNumberText
 } from '$lib/domain/page-numbering';
 import type {
+	CoverPosition,
 	JsonValue,
 	MediaAsset,
 	PageNumberingSettings,
@@ -309,13 +310,33 @@ async function prepareFonts(): Promise<void> {
 
 function coverContent(
 	asset: PreparedPdfAsset,
-	contentWidth: number,
-	contentHeight: number
+	pageWidth: number,
+	pageHeight: number,
+	position: CoverPosition
 ): ContentImage | ContentSvg {
-	const fit: [number, number] = [contentWidth, contentHeight];
-	return asset.kind === 'svg'
-		? { svg: asset.source, fit, alignment: 'center', margin: [0, 0, 0, 0] }
-		: { image: asset.source, fit, alignment: 'center', margin: [0, 0, 0, 0] };
+	const [verticalPosition, horizontalPosition] =
+		position === 'center' ? ['center', 'center'] : position.split('-');
+	const align = horizontalPosition as 'left' | 'center' | 'right';
+	const valign = verticalPosition as 'top' | 'center' | 'bottom';
+
+	if (asset.kind === 'svg') {
+		const svgAlignment = `${align === 'left' ? 'xMin' : align === 'right' ? 'xMax' : 'xMid'}${
+			valign === 'top' ? 'YMin' : valign === 'bottom' ? 'YMax' : 'YMid'
+		} slice`;
+		const svg = asset.source.replace(/<svg\b([^>]*)>/i, (_match, attributes: string) => {
+			const positionedAttributes = attributes
+				.replace(/\s+preserveAspectRatio\s*=\s*(["']).*?\1/i, '')
+				.replace(/\s+overflow\s*=\s*(["']).*?\1/i, '');
+			return `<svg${positionedAttributes} preserveAspectRatio="${svgAlignment}" overflow="hidden">`;
+		});
+		return { svg, width: pageWidth, height: pageHeight, margin: [0, 0, 0, 0] };
+	}
+
+	return {
+		image: asset.source,
+		cover: { width: pageWidth, height: pageHeight, align, valign },
+		margin: [0, 0, 0, 0]
+	};
 }
 
 function manuscriptHeadingContent(
@@ -400,7 +421,13 @@ export async function buildPdfDefinition(
 	const frontCover = frontCoverId ? preparedAssets.get(frontCoverId) : undefined;
 	if (frontCover) {
 		content.push({
-			section: coverContent(frontCover, contentWidth, contentHeight),
+			section: coverContent(
+				frontCover,
+				page.width,
+				page.height,
+				workspace.project.frontCoverPosition ?? 'center'
+			),
+			pageMargins: [0, 0, 0, 0],
 			footer: null
 		});
 	}
@@ -437,7 +464,13 @@ export async function buildPdfDefinition(
 	const backCover = backCoverId ? preparedAssets.get(backCoverId) : undefined;
 	if (backCover) {
 		content.push({
-			section: coverContent(backCover, contentWidth, contentHeight),
+			section: coverContent(
+				backCover,
+				page.width,
+				page.height,
+				workspace.project.backCoverPosition ?? 'center'
+			),
+			pageMargins: [0, 0, 0, 0],
 			footer: null
 		});
 	}

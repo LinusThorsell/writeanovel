@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ContentImage, ContentSection, ContentSvg } from 'pdfmake/interfaces';
 import type { WorkspaceSnapshot } from '$lib/domain/types';
 import { buildPdfDefinition } from '$lib/export/pdf-exporter';
 
@@ -78,5 +79,85 @@ describe('PDF export', () => {
 
 		expect(textAlignment(definition.content, 'Default book paragraph.')).toBe('justify');
 		expect(textAlignment(definition.content, 'Deliberately left aligned.')).toBe('justify');
+	});
+
+	it('makes raster covers full bleed and applies their crop positions', async () => {
+		const snapshot = workspace();
+		snapshot.project.frontCoverAssetId = 'front-cover';
+		snapshot.project.frontCoverPosition = 'top-left';
+		snapshot.project.backCoverAssetId = 'back-cover';
+		snapshot.project.backCoverPosition = 'bottom-right';
+		const pixel = new Blob(
+			[
+				Uint8Array.from(
+					atob(
+						'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII='
+					),
+					(character) => character.charCodeAt(0)
+				)
+			],
+			{ type: 'image/png' }
+		);
+		snapshot.assets = ['front-cover', 'back-cover'].map((id) => ({
+			id,
+			projectId: snapshot.project.id,
+			name: `${id}.png`,
+			mimeType: 'image/png',
+			bytes: pixel,
+			createdAt: snapshot.project.createdAt,
+			updatedAt: snapshot.project.updatedAt
+		}));
+
+		const definition = await buildPdfDefinition(snapshot);
+		const sections = definition.content as ContentSection[];
+		const front = sections[0];
+		const back = sections.at(-1)!;
+
+		expect(front.pageMargins).toEqual([0, 0, 0, 0]);
+		expect(back.pageMargins).toEqual([0, 0, 0, 0]);
+		expect((front.section as ContentImage).cover).toEqual({
+			width: 432,
+			height: 648,
+			align: 'left',
+			valign: 'top'
+		});
+		expect((back.section as ContentImage).cover).toEqual({
+			width: 432,
+			height: 648,
+			align: 'right',
+			valign: 'bottom'
+		});
+	});
+
+	it('uses aspect-ratio cropping for full-bleed SVG covers', async () => {
+		const snapshot = workspace();
+		snapshot.project.frontCoverAssetId = 'svg-cover';
+		snapshot.project.frontCoverPosition = 'bottom-right';
+		snapshot.assets = [
+			{
+				id: 'svg-cover',
+				projectId: snapshot.project.id,
+				name: 'cover.svg',
+				mimeType: 'image/svg+xml',
+				bytes: new Blob(
+					[
+						'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100"/></svg>'
+					],
+					{ type: 'image/svg+xml' }
+				),
+				createdAt: snapshot.project.createdAt,
+				updatedAt: snapshot.project.updatedAt
+			}
+		];
+
+		const definition = await buildPdfDefinition(snapshot);
+		const front = (definition.content as ContentSection[])[0];
+		const svg = front.section as ContentSvg;
+
+		expect(front.pageMargins).toEqual([0, 0, 0, 0]);
+		expect(svg.width).toBe(432);
+		expect(svg.height).toBe(648);
+		expect(svg.svg).toContain('preserveAspectRatio="xMaxYMax slice"');
+		expect(svg.svg).toContain('overflow="hidden"');
 	});
 });

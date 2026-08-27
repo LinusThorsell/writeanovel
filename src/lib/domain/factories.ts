@@ -21,6 +21,8 @@ export function createNovelProject(input: Pick<NovelProject, 'title' | 'author'>
 		synopsis: '',
 		trimSize: 'trade-6x9',
 		typography: 'literary',
+		frontCoverPosition: 'center',
+		backCoverPosition: 'center',
 		chapterHeading: { ...DEFAULT_CHAPTER_HEADING },
 		createdAt: timestamp,
 		updatedAt: timestamp

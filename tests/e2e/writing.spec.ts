@@ -786,10 +786,7 @@ test('configures book pages, raster and SVG covers, and positioned resizable art
 	await frontCover.locator('input[type=file]').setInputFiles({
 		name: 'front-cover.png',
 		mimeType: 'image/png',
-		buffer: Buffer.from(
-			'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=',
-			'base64'
-		)
+		buffer: await readFile('static/apple-touch-icon.png')
 	});
 	await expect(frontCover.getByRole('img', { name: 'front cover' })).toBeVisible();
 	const coverSvg =
@@ -801,7 +798,21 @@ test('configures book pages, raster and SVG covers, and positioned resizable art
 		buffer: Buffer.from(coverSvg)
 	});
 	await expect(backCover.getByRole('img', { name: 'back cover' })).toBeVisible();
+	await page.getByLabel('Front cover crop position').selectOption('top-left');
+	await page.getByLabel('Back cover crop position').selectOption('bottom-right');
 	await page.getByRole('button', { name: 'Save book settings' }).click();
+	await page.getByRole('button', { name: 'Book settings', exact: true }).click();
+	await expect(page.getByLabel('Front cover crop position')).toHaveValue('top-left');
+	await expect(page.getByLabel('Back cover crop position')).toHaveValue('bottom-right');
+	await page.getByRole('button', { name: 'Save book settings' }).click();
+	await page.getByText('Export', { exact: true }).click();
+	const coverPdfDownload = page.waitForEvent('download');
+	await page.locator('.export-menu').getByRole('button', { name: /PDF/ }).click();
+	const coverPdfPath = await (await coverPdfDownload).path();
+	if (!coverPdfPath) throw new Error('The illustrated PDF was not available for verification.');
+	const coverPdfBytes = new Uint8Array(await readFile(coverPdfPath));
+	expect(new TextDecoder().decode(coverPdfBytes.slice(0, 5))).toBe('%PDF-');
+	expect((await extractTextItems(coverPdfBytes)).totalPages).toBe(5);
 
 	await page.getByRole('button', { name: /1 Chapter 1/ }).click();
 	const chapterSvg =

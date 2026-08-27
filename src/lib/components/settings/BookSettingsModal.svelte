@@ -7,6 +7,7 @@
 	import { bookPageNumbering } from '$lib/domain/page-numbering';
 	import type {
 		ChapterHeadingSettings,
+		CoverPosition,
 		PageNumberingSettings,
 		TrimSize,
 		TypographyPreset
@@ -24,9 +25,47 @@
 	let synopsis = $state(project.synopsis);
 	let trimSize = $state<TrimSize>(project.trimSize);
 	let typography = $state<TypographyPreset>(project.typography);
+	let frontCoverPosition = $state<CoverPosition>(project.frontCoverPosition ?? 'center');
+	let backCoverPosition = $state<CoverPosition>(project.backCoverPosition ?? 'center');
 	let chapterHeading = $state<ChapterHeadingSettings>({ ...bookChapterHeading(project) });
 	let pageNumbering = $state<PageNumberingSettings>({ ...bookPageNumbering(project, documents)! });
 	let savingCover = $state<'front' | 'back'>();
+	const coverPositions: { value: CoverPosition; label: string }[] = [
+		{ value: 'top-left', label: 'Top left' },
+		{ value: 'top-center', label: 'Top center' },
+		{ value: 'top-right', label: 'Top right' },
+		{ value: 'center-left', label: 'Center left' },
+		{ value: 'center', label: 'Center' },
+		{ value: 'center-right', label: 'Center right' },
+		{ value: 'bottom-left', label: 'Bottom left' },
+		{ value: 'bottom-center', label: 'Bottom center' },
+		{ value: 'bottom-right', label: 'Bottom right' }
+	];
+	const coverObjectPositions: Record<CoverPosition, string> = {
+		'top-left': 'left top',
+		'top-center': 'center top',
+		'top-right': 'right top',
+		'center-left': 'left center',
+		center: 'center center',
+		'center-right': 'right center',
+		'bottom-left': 'left bottom',
+		'bottom-center': 'center bottom',
+		'bottom-right': 'right bottom'
+	};
+	const trimAspectRatios: Record<TrimSize, string> = {
+		'trade-6x9': '2 / 3',
+		a5: '148 / 210',
+		letter: '8.5 / 11'
+	};
+
+	function coverPosition(side: 'front' | 'back'): CoverPosition {
+		return side === 'front' ? frontCoverPosition : backCoverPosition;
+	}
+
+	function setCoverPosition(side: 'front' | 'back', position: CoverPosition): void {
+		if (side === 'front') frontCoverPosition = position;
+		else backCoverPosition = position;
+	}
 
 	function coverUrl(side: 'front' | 'back'): string | undefined {
 		const assetId =
@@ -59,6 +98,8 @@
 			synopsis,
 			trimSize,
 			typography,
+			frontCoverPosition,
+			backCoverPosition,
 			chapterHeading: { ...chapterHeading },
 			pageNumbering: { ...pageNumbering }
 		});
@@ -125,19 +166,37 @@
 
 		<section class="covers">
 			<h3>Front and back cover</h3>
-			<p class="muted">Choose a cover image. Portrait artwork works best.</p>
+			<p class="muted">Covers fill the entire PDF page. Choose where any cropping happens.</p>
 			<div class="cover-pair">
 				{#each ['front', 'back'] as side (side)}
 					{@const coverSide = side === 'front' ? 'front' : 'back'}
 					<div class="cover-card">
-						<div class="cover-preview">
+						<div class="cover-preview" style:aspect-ratio={trimAspectRatios[trimSize]}>
 							{#if coverUrl(coverSide)}
-								<img src={coverUrl(coverSide)} alt={`${coverSide} cover`} />
+								<img
+									src={coverUrl(coverSide)}
+									alt={`${coverSide} cover`}
+									style:object-position={coverObjectPositions[coverPosition(coverSide)]}
+								/>
 							{:else}
 								<BookImage size={34} /><span>No {coverSide} cover</span>
 							{/if}
 						</div>
 						<strong>{coverSide === 'front' ? 'Front cover' : 'Back cover'}</strong>
+						{#if coverUrl(coverSide)}
+							<label class="cover-position">
+								<span>{coverSide === 'front' ? 'Front' : 'Back'} cover crop position</span>
+								<select
+									value={coverPosition(coverSide)}
+									onchange={(event) =>
+										setCoverPosition(coverSide, event.currentTarget.value as CoverPosition)}
+								>
+									{#each coverPositions as position (position.value)}
+										<option value={position.value}>{position.label}</option>
+									{/each}
+								</select>
+							</label>
+						{/if}
 						<label class="button button-secondary upload-button">
 							<Upload size={16} />{savingCover === coverSide ? 'Adding…' : 'Choose image'}
 							<input
@@ -277,12 +336,29 @@
 	.cover-preview img {
 		width: 100%;
 		height: 100%;
-		object-fit: contain;
-		background: white;
+		object-fit: cover;
 	}
 
 	.cover-preview span {
 		margin-top: -1.5rem;
+	}
+
+	.cover-position {
+		display: grid;
+		gap: 0.3rem;
+		text-align: left;
+	}
+
+	.cover-position span {
+		color: var(--ink-soft);
+		font-size: 0.68rem;
+	}
+
+	.cover-position select {
+		width: 100%;
+		min-width: 0;
+		padding: 0.45rem 0.5rem;
+		font-size: 0.72rem;
 	}
 
 	.upload-button {
