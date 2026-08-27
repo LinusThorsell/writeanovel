@@ -19,10 +19,13 @@ export type RichTextNode = {
 
 export type DrawingPoint = [x: number, y: number, pressure: number];
 
-type DrawingElementStyle = {
+type DrawingElementBase = {
 	id: string;
-	stroke: string;
 	strokeWidth: number;
+};
+
+type DrawingElementStyle = DrawingElementBase & {
+	stroke: string;
 };
 
 export type FreehandDrawingElement = DrawingElementStyle & {
@@ -54,8 +57,26 @@ export type EllipseDrawingElement = DrawingElementStyle & {
 	ry: number;
 };
 
+export type TextDrawingElement = DrawingElementStyle & {
+	type: 'text';
+	x: number;
+	y: number;
+	text: string;
+	fontSize: number;
+};
+
+export type EraserDrawingElement = DrawingElementBase & {
+	type: 'eraser';
+	points: DrawingPoint[];
+};
+
 export type DrawingElement =
-	FreehandDrawingElement | LineDrawingElement | RectangleDrawingElement | EllipseDrawingElement;
+	| FreehandDrawingElement
+	| LineDrawingElement
+	| RectangleDrawingElement
+	| EllipseDrawingElement
+	| TextDrawingElement
+	| EraserDrawingElement;
 
 export type DrawingDocument = {
 	version: 1;

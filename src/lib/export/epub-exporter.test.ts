@@ -58,16 +58,27 @@ describe('EPUB export', () => {
 	it('packages editable drawing previews as SVG artwork', async () => {
 		const snapshot = workspace();
 		const drawingDocument = createEmptyDrawing();
-		drawingDocument.elements.push({
-			id: 'circle-1',
-			type: 'ellipse',
-			stroke: '#243d33',
-			strokeWidth: 10,
-			cx: 512,
-			cy: 512,
-			rx: 200,
-			ry: 200
-		});
+		drawingDocument.elements.push(
+			{
+				id: 'circle-1',
+				type: 'ellipse',
+				stroke: '#243d33',
+				strokeWidth: 10,
+				cx: 512,
+				cy: 512,
+				rx: 200,
+				ry: 200
+			},
+			{
+				id: 'eraser-1',
+				type: 'eraser',
+				strokeWidth: 48,
+				points: [
+					[300, 512, 0.5],
+					[380, 512, 0.5]
+				]
+			}
+		);
 		const asset = createDrawingAsset(snapshot.project.id, drawingDocument);
 		asset.id = 'drawing-1';
 		snapshot.assets = [asset];
@@ -82,6 +93,7 @@ describe('EPUB export', () => {
 
 		expect(chapter).toContain('../images/drawing-1.svg');
 		expect(svg).toContain('<ellipse');
+		expect(svg).toContain('<mask id="drawing-eraser-mask-0"');
 		expect(await archive.file('OEBPS/content.opf')?.async('string')).toContain(
 			'media-type="image/svg+xml"'
 		);

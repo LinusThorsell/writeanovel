@@ -8,9 +8,11 @@
 		Save,
 		Square,
 		Trash2,
+		Type,
 		Undo2
 	} from '@lucide/svelte';
 	import { untrack } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import {
 		DEFAULT_DRAWING_STROKE,
@@ -24,10 +26,17 @@
 		DrawingDocument,
 		DrawingElement,
 		DrawingPoint,
-		FreehandDrawingElement
+		EraserDrawingElement,
+		FreehandDrawingElement,
+		TextDrawingElement
 	} from '$lib/domain/types';
 
-	type DrawingTool = 'freehand' | ShapeTool | 'eraser';
+	type DrawingTool = 'freehand' | ShapeTool | 'text' | 'eraser';
+
+	type TextDraft = Pick<
+		TextDrawingElement,
+		'id' | 'x' | 'y' | 'stroke' | 'strokeWidth' | 'fontSize'
+	> & { selectOnFocus: boolean };
 
 	type Props = {
 		drawing: DrawingDocument;
@@ -45,11 +54,14 @@
 	let tool = $state<DrawingTool>('freehand');
 	let stroke = $state(DEFAULT_DRAWING_STROKE);
 	let strokeWidth = $state(DEFAULT_DRAWING_STROKE_WIDTH);
+	let eraserWidth = $state(56);
+	let fontSize = $state(42);
+	let textDraft = $state.raw<TextDraft>();
+	let textValue = $state('');
 	let activePointerId: number | undefined;
 	let gestureStart: { x: number; y: number } | undefined;
 	let gestureElements: DrawingElement[] | undefined;
 	let gestureElementId: string | undefined;
-	let erasedDuringGesture = false;
 	const visibleElements = $derived(preview ? [...elements, preview] : elements);
 
 	function cloneElements(value: DrawingElement[]): DrawingElement[] {
@@ -78,28 +90,31 @@
 		];
 	}
 
-	function eraseAt(point: DrawingPoint): void {
-		for (let index = elements.length - 1; index >= 0; index -= 1) {
-			if (!drawingElementContainsPoint(elements[index], { x: point[0], y: point[1] }, 18)) continue;
-			elements = elements.filter((_, candidateIndex) => candidateIndex !== index);
-			erasedDuringGesture = true;
-			return;
-		}
+	function erasersAfter(index: number): EraserDrawingElement[] {
+		return visibleElements
+			.slice(index + 1)
+			.filter((element): element is EraserDrawingElement => element.type === 'eraser');
 	}
 
 	function startDrawing(event: PointerEvent): void {
 		if (event.button !== 0) return;
+		if (tool === 'text') return;
 		const surface = event.currentTarget as SVGSVGElement;
+		const point = eventPoint(event, surface);
+
 		surface.setPointerCapture(event.pointerId);
 		activePointerId = event.pointerId;
-		const point = eventPoint(event, surface);
 		gestureStart = { x: point[0], y: point[1] };
 		gestureElements = cloneElements(elements);
 		gestureElementId = crypto.randomUUID();
-		erasedDuringGesture = false;
 
 		if (tool === 'eraser') {
-			eraseAt(point);
+			preview = {
+				id: gestureElementId,
+				type: 'eraser',
+				strokeWidth: eraserWidth,
+				points: [point]
+			};
 			return;
 		}
 		if (tool === 'freehand') {
@@ -121,17 +136,13 @@
 	function continueDrawing(event: PointerEvent): void {
 		if (event.pointerId !== activePointerId || !gestureStart || !gestureElementId) return;
 		const surface = event.currentTarget as SVGSVGElement;
-		if (tool === 'eraser') {
-			eraseAt(eventPoint(event, surface));
-			return;
-		}
-		if (tool === 'freehand' && preview?.type === 'freehand') {
+		if (preview?.type === 'freehand' || preview?.type === 'eraser') {
 			const events = event.getCoalescedEvents?.() ?? [event];
 			const nextPoints = events.map((candidate) => eventPoint(candidate, surface));
 			preview = { ...preview, points: [...preview.points, ...nextPoints] };
 			return;
 		}
-		if (tool !== 'freehand') {
+		if (tool === 'line' || tool === 'rectangle' || tool === 'ellipse') {
 			const point = eventPoint(event, surface);
 			preview = shapeFromDrag(
 				tool,
@@ -145,24 +156,25 @@
 	}
 
 	function finishDrawing(event: PointerEvent): void {
+		if (tool === 'text') {
+			beginTextEditing(eventPoint(event, event.currentTarget as SVGSVGElement));
+			return;
+		}
 		if (event.pointerId !== activePointerId) return;
 		const surface = event.currentTarget as SVGSVGElement;
 		if (surface.hasPointerCapture(event.pointerId)) surface.releasePointerCapture(event.pointerId);
 
-		if (tool === 'eraser') {
-			if (erasedDuringGesture && gestureElements) {
-				undoStack = [...undoStack, gestureElements];
-				redoStack = [];
-			}
-		} else if (preview && gestureElements) {
+		if (preview && gestureElements) {
 			const shouldCommit =
-				preview.type === 'freehand'
+				preview.type === 'freehand' || preview.type === 'eraser'
 					? preview.points.length > 0
 					: preview.type === 'line'
 						? Math.hypot(preview.x2 - preview.x1, preview.y2 - preview.y1) > 2
 						: preview.type === 'rectangle'
 							? preview.width > 2 && preview.height > 2
-							: preview.rx > 1 && preview.ry > 1;
+							: preview.type === 'ellipse'
+								? preview.rx > 1 && preview.ry > 1
+								: false;
 			if (shouldCommit) {
 				undoStack = [...undoStack, gestureElements];
 				redoStack = [];
@@ -203,6 +215,113 @@
 		redoStack = redoStack.slice(0, -1);
 	}
 
+	function beginTextEditing(point: DrawingPoint): void {
+		commitText();
+		const existing = [...elements]
+			.reverse()
+			.find(
+				(element) =>
+					element.type === 'text' &&
+					drawingElementContainsPoint(element, { x: point[0], y: point[1] }, 10)
+			) as TextDrawingElement | undefined;
+
+		if (existing) {
+			stroke = existing.stroke;
+			fontSize = existing.fontSize;
+			textValue = existing.text;
+			textDraft = {
+				id: existing.id,
+				x: existing.x,
+				y: existing.y,
+				stroke: existing.stroke,
+				strokeWidth: existing.strokeWidth,
+				fontSize: existing.fontSize,
+				selectOnFocus: true
+			};
+		} else {
+			textValue = '';
+			textDraft = {
+				id: crypto.randomUUID(),
+				x: Math.min(point[0], startingDrawing.width - 80),
+				y: Math.max(fontSize, Math.min(point[1], startingDrawing.height - fontSize * 0.25)),
+				stroke,
+				strokeWidth: 1,
+				fontSize,
+				selectOnFocus: false
+			};
+		}
+	}
+
+	function focusTextInput(selectOnFocus: boolean): Attachment<HTMLInputElement> {
+		return (element) => {
+			element.focus();
+			if (selectOnFocus) element.select();
+		};
+	}
+
+	function commitText(): void {
+		const draft = textDraft;
+		if (!draft) return;
+		textDraft = undefined;
+		const value = textValue.trim();
+		const existingIndex = elements.findIndex(
+			(element) => element.type === 'text' && element.id === draft.id
+		);
+		const { selectOnFocus: _, ...elementFields } = draft;
+		const nextElement: TextDrawingElement = { ...elementFields, type: 'text', text: value };
+		const nextElements =
+			existingIndex >= 0
+				? value
+					? elements.map((element, index) => (index === existingIndex ? nextElement : element))
+					: elements.filter((_, index) => index !== existingIndex)
+				: value
+					? [...elements, nextElement]
+					: elements;
+
+		if (JSON.stringify(nextElements) !== JSON.stringify(elements)) {
+			undoStack = [...undoStack, cloneElements(elements)];
+			redoStack = [];
+			elements = nextElements;
+		}
+		textValue = '';
+	}
+
+	function cancelTextEditing(): void {
+		textDraft = undefined;
+		textValue = '';
+	}
+
+	function handleTextInputKeydown(event: KeyboardEvent): void {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			event.stopPropagation();
+			commitText();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			event.stopPropagation();
+			cancelTextEditing();
+		}
+	}
+
+	function handleKeyboardShortcut(event: KeyboardEvent): void {
+		if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
+		if (
+			event.target instanceof HTMLInputElement &&
+			event.target.dataset.drawingTextInput === 'true'
+		)
+			return;
+
+		const key = event.key.toLowerCase();
+		const isUndo = key === 'z' && !event.shiftKey;
+		const isRedo = (key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey);
+		if (!isUndo && !isRedo) return;
+
+		event.preventDefault();
+		event.stopPropagation();
+		if (isUndo) undo();
+		else redo();
+	}
+
 	function clearDrawing(): void {
 		if (elements.length === 0) return;
 		undoStack = [...undoStack, cloneElements(elements)];
@@ -224,15 +343,19 @@
 				return 'Rectangle or square';
 			case 'ellipse':
 				return 'Ellipse or circle';
+			case 'text':
+				return 'Text';
 			case 'eraser':
 				return 'Eraser';
 		}
 	}
 </script>
 
+<svelte:window onkeydown={handleKeyboardShortcut} />
+
 <Modal
 	title="Edit drawing"
-	description="Draw freely or add geometric shapes. Hold Shift to make squares, circles, and snapped lines."
+	description="Draw freely, add shapes or text, and brush away only the parts you erase. Hold Shift to constrain shapes and lines."
 	width="large"
 	{onClose}
 >
@@ -269,6 +392,13 @@
 				>
 				<button
 					type="button"
+					class:active={tool === 'text'}
+					aria-label="Text"
+					aria-pressed={tool === 'text'}
+					onclick={() => (tool = 'text')}><Type size={18} /></button
+				>
+				<button
+					type="button"
 					class:active={tool === 'eraser'}
 					aria-label="Eraser"
 					aria-pressed={tool === 'eraser'}
@@ -281,18 +411,25 @@
 					<span>Color</span>
 					<input type="color" bind:value={stroke} disabled={tool === 'eraser'} />
 				</label>
-				<label class="width-control">
-					<span>Width</span>
-					<input
-						type="range"
-						min="3"
-						max="48"
-						step="1"
-						bind:value={strokeWidth}
-						disabled={tool === 'eraser'}
-					/>
-					<output>{strokeWidth}</output>
-				</label>
+				{#if tool === 'text'}
+					<label class="width-control">
+						<span>Size</span>
+						<input type="range" min="16" max="96" step="1" bind:value={fontSize} />
+						<output>{fontSize}</output>
+					</label>
+				{:else if tool === 'eraser'}
+					<label class="width-control">
+						<span>Size</span>
+						<input type="range" min="12" max="160" step="2" bind:value={eraserWidth} />
+						<output>{eraserWidth}</output>
+					</label>
+				{:else}
+					<label class="width-control">
+						<span>Width</span>
+						<input type="range" min="3" max="48" step="1" bind:value={strokeWidth} />
+						<output>{strokeWidth}</output>
+					</label>
+				{/if}
 			</div>
 
 			<div class="history-controls" role="group" aria-label="Drawing history">
@@ -330,44 +467,100 @@
 				onpointerup={finishDrawing}
 				onpointercancel={cancelGesture}
 			>
+				<defs>
+					{#each visibleElements as element, index (element.id)}
+						{@const erasers = erasersAfter(index)}
+						{#if element.type !== 'eraser' && erasers.length > 0}
+							<mask
+								id={`drawing-eraser-mask-${index}`}
+								maskUnits="userSpaceOnUse"
+								x="0"
+								y="0"
+								width={startingDrawing.width}
+								height={startingDrawing.height}
+								style="mask-type: luminance"
+							>
+								<rect width="100%" height="100%" fill="white"></rect>
+								{#each erasers as eraser (eraser.id)}
+									<path d={freehandSvgPath(eraser.points, eraser.strokeWidth)} fill="black"></path>
+								{/each}
+							</mask>
+						{/if}
+					{/each}
+				</defs>
 				<rect width="100%" height="100%" fill={startingDrawing.background}></rect>
-				{#each visibleElements as element (element.id)}
-					{#if element.type === 'freehand'}
-						<path d={freehandSvgPath(element.points, element.strokeWidth)} fill={element.stroke}
-						></path>
-					{:else if element.type === 'line'}
-						<line
-							x1={element.x1}
-							y1={element.y1}
-							x2={element.x2}
-							y2={element.y2}
-							stroke={element.stroke}
-							stroke-width={element.strokeWidth}
-							stroke-linecap="round"
-						></line>
-					{:else if element.type === 'rectangle'}
-						<rect
-							x={element.x}
-							y={element.y}
-							width={element.width}
-							height={element.height}
-							fill="none"
-							stroke={element.stroke}
-							stroke-width={element.strokeWidth}
-							stroke-linejoin="round"
-						></rect>
-					{:else}
-						<ellipse
-							cx={element.cx}
-							cy={element.cy}
-							rx={element.rx}
-							ry={element.ry}
-							fill="none"
-							stroke={element.stroke}
-							stroke-width={element.strokeWidth}
-						></ellipse>
+				{#each visibleElements as element, index (element.id)}
+					{@const erasers = erasersAfter(index)}
+					{#if element.type !== 'eraser'}
+						<g mask={erasers.length > 0 ? `url(#drawing-eraser-mask-${index})` : undefined}>
+							{#if element.type === 'freehand'}
+								<path d={freehandSvgPath(element.points, element.strokeWidth)} fill={element.stroke}
+								></path>
+							{:else if element.type === 'line'}
+								<line
+									x1={element.x1}
+									y1={element.y1}
+									x2={element.x2}
+									y2={element.y2}
+									stroke={element.stroke}
+									stroke-width={element.strokeWidth}
+									stroke-linecap="round"
+								></line>
+							{:else if element.type === 'rectangle'}
+								<rect
+									x={element.x}
+									y={element.y}
+									width={element.width}
+									height={element.height}
+									fill="none"
+									stroke={element.stroke}
+									stroke-width={element.strokeWidth}
+									stroke-linejoin="round"
+								></rect>
+							{:else if element.type === 'ellipse'}
+								<ellipse
+									cx={element.cx}
+									cy={element.cy}
+									rx={element.rx}
+									ry={element.ry}
+									fill="none"
+									stroke={element.stroke}
+									stroke-width={element.strokeWidth}
+								></ellipse>
+							{:else}
+								<text
+									x={element.x}
+									y={element.y}
+									fill={element.stroke}
+									font-family="Arial, sans-serif"
+									font-size={element.fontSize}>{element.text}</text
+								>
+							{/if}
+						</g>
 					{/if}
 				{/each}
+				{#if textDraft}
+					<foreignObject
+						x={textDraft.x}
+						y={textDraft.y - textDraft.fontSize * 1.2}
+						width={Math.max(100, startingDrawing.width - textDraft.x)}
+						height={textDraft.fontSize * 1.7}
+					>
+						<input
+							class="canvas-text-input"
+							aria-label="Drawing text"
+							data-drawing-text-input="true"
+							{@attach focusTextInput(textDraft.selectOnFocus)}
+							bind:value={textValue}
+							style:color={textDraft.stroke}
+							style:font-size={`${textDraft.fontSize}px`}
+							onpointerdown={(event) => event.stopPropagation()}
+							onpointerup={(event) => event.stopPropagation()}
+							onkeydown={handleTextInputKeydown}
+							onblur={commitText}
+						/>
+					</foreignObject>
+				{/if}
 			</svg>
 		</div>
 
@@ -492,6 +685,19 @@
 
 	svg.erasing {
 		cursor: cell;
+	}
+
+	.canvas-text-input {
+		box-sizing: border-box;
+		width: 100%;
+		height: 100%;
+		padding: 0 0.18em;
+		font-family: Arial, sans-serif;
+		line-height: 1.2;
+		background: rgb(255 254 250 / 94%);
+		border: 2px dashed var(--forest);
+		border-radius: 0.15em;
+		outline: none;
 	}
 
 	.actions {

@@ -4,6 +4,7 @@ import type {
 	DrawingElement,
 	DrawingPoint,
 	EllipseDrawingElement,
+	EraserDrawingElement,
 	LineDrawingElement,
 	RectangleDrawingElement
 } from './types';
@@ -76,27 +77,63 @@ export function freehandSvgPath(points: DrawingPoint[], strokeWidth: number): st
 }
 
 function elementSvg(element: DrawingElement): string {
-	const stroke = escapeXml(element.stroke);
 	const strokeWidth = rounded(element.strokeWidth);
 	switch (element.type) {
 		case 'freehand':
-			return `<path d="${freehandSvgPath(element.points, element.strokeWidth)}" fill="${stroke}" />`;
+			return `<path d="${freehandSvgPath(element.points, element.strokeWidth)}" fill="${escapeXml(element.stroke)}" />`;
 		case 'line':
-			return `<line x1="${rounded(element.x1)}" y1="${rounded(element.y1)}" x2="${rounded(element.x2)}" y2="${rounded(element.y2)}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" />`;
+			return `<line x1="${rounded(element.x1)}" y1="${rounded(element.y1)}" x2="${rounded(element.x2)}" y2="${rounded(element.y2)}" fill="none" stroke="${escapeXml(element.stroke)}" stroke-width="${strokeWidth}" stroke-linecap="round" />`;
 		case 'rectangle':
-			return `<rect x="${rounded(element.x)}" y="${rounded(element.y)}" width="${rounded(element.width)}" height="${rounded(element.height)}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linejoin="round" />`;
+			return `<rect x="${rounded(element.x)}" y="${rounded(element.y)}" width="${rounded(element.width)}" height="${rounded(element.height)}" fill="none" stroke="${escapeXml(element.stroke)}" stroke-width="${strokeWidth}" stroke-linejoin="round" />`;
 		case 'ellipse':
-			return `<ellipse cx="${rounded(element.cx)}" cy="${rounded(element.cy)}" rx="${rounded(element.rx)}" ry="${rounded(element.ry)}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
+			return `<ellipse cx="${rounded(element.cx)}" cy="${rounded(element.cy)}" rx="${rounded(element.rx)}" ry="${rounded(element.ry)}" fill="none" stroke="${escapeXml(element.stroke)}" stroke-width="${strokeWidth}" />`;
+		case 'text':
+			return `<text x="${rounded(element.x)}" y="${rounded(element.y)}" fill="${escapeXml(element.stroke)}" font-family="Arial, sans-serif" font-size="${rounded(element.fontSize)}">${escapeXml(element.text)}</text>`;
+		case 'eraser':
+			return '';
 	}
+}
+
+function eraserMaskSvg(
+	id: string,
+	erasers: EraserDrawingElement[],
+	width: number,
+	height: number
+): string {
+	return [
+		`<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${rounded(width)}" height="${rounded(height)}" style="mask-type:luminance">`,
+		`<rect width="100%" height="100%" fill="white" />`,
+		...erasers.map(
+			(eraser) => `<path d="${freehandSvgPath(eraser.points, eraser.strokeWidth)}" fill="black" />`
+		),
+		'</mask>'
+	].join('');
 }
 
 export function drawingToSvg(drawing: DrawingDocument): string {
 	const width = Math.max(1, drawing.width);
 	const height = Math.max(1, drawing.height);
+	const masks: string[] = [];
+	const content: string[] = [];
+	drawing.elements.forEach((element, index) => {
+		if (element.type === 'eraser') return;
+		const erasers = drawing.elements
+			.slice(index + 1)
+			.filter((candidate): candidate is EraserDrawingElement => candidate.type === 'eraser');
+		const svg = elementSvg(element);
+		if (erasers.length === 0) {
+			content.push(svg);
+			return;
+		}
+		const maskId = `drawing-eraser-mask-${index}`;
+		masks.push(eraserMaskSvg(maskId, erasers, width, height));
+		content.push(`<g mask="url(#${maskId})">${svg}</g>`);
+	});
 	return [
 		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${rounded(width)} ${rounded(height)}" width="${rounded(width)}" height="${rounded(height)}">`,
 		`<rect width="100%" height="100%" fill="${escapeXml(drawing.background)}" />`,
-		...drawing.elements.map(elementSvg),
+		...(masks.length > 0 ? [`<defs>${masks.join('')}</defs>`] : []),
+		...content,
 		'</svg>'
 	].join('');
 }
@@ -182,6 +219,7 @@ export function drawingElementContainsPoint(
 	const hitWidth = tolerance + element.strokeWidth / 2;
 	switch (element.type) {
 		case 'freehand':
+		case 'eraser':
 			return element.points.some((candidate, index) => {
 				const next = element.points[index + 1];
 				return next
@@ -214,6 +252,18 @@ export function drawingElementContainsPoint(
 			const x = (point.x - element.cx) / rx;
 			const y = (point.y - element.cy) / ry;
 			return x * x + y * y <= 1;
+		}
+		case 'text': {
+			const width = Math.max(
+				element.fontSize * 0.6,
+				[...element.text].length * element.fontSize * 0.6
+			);
+			return (
+				point.x >= element.x - tolerance &&
+				point.x <= element.x + width + tolerance &&
+				point.y >= element.y - element.fontSize - tolerance &&
+				point.y <= element.y + element.fontSize * 0.25 + tolerance
+			);
 		}
 	}
 }

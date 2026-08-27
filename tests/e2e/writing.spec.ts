@@ -97,11 +97,22 @@ test('inserts, draws, reopens, edits, and persists an editable drawing block', a
 		steps: 8
 	});
 	await page.mouse.up();
-	await expect(canvas.locator('path')).toHaveCount(1);
-	await page.getByRole('button', { name: 'Undo drawing action' }).click();
-	await expect(canvas.locator('path')).toHaveCount(0);
-	await page.getByRole('button', { name: 'Redo drawing action' }).click();
-	await expect(canvas.locator('path')).toHaveCount(1);
+	await expect(canvas.locator(':scope > g > path')).toHaveCount(1);
+	await page.keyboard.press('Control+z');
+	await expect(canvas.locator(':scope > g > path')).toHaveCount(0);
+	await page.keyboard.press('Control+Shift+z');
+	await expect(canvas.locator(':scope > g > path')).toHaveCount(1);
+	await page.getByRole('button', { name: 'Text', exact: true }).click();
+	await canvas.click({ position: { x: bounds.width * 0.2, y: bounds.height * 0.48 } });
+	const textInput = page.getByLabel('Drawing text');
+	await expect(textInput).toBeFocused();
+	await textInput.fill('Harbor label');
+	await textInput.press('Enter');
+	await expect(canvas.getByText('Harbor label', { exact: true })).toBeVisible();
+	await page.keyboard.press('Control+z');
+	await expect(canvas.getByText('Harbor label', { exact: true })).toHaveCount(0);
+	await page.keyboard.press('Control+y');
+	await expect(canvas.getByText('Harbor label', { exact: true })).toBeVisible();
 
 	await page.getByRole('button', { name: 'Rectangle or square' }).click();
 	await page.mouse.move(bounds.x + bounds.width * 0.18, bounds.y + bounds.height * 0.55);
@@ -122,10 +133,23 @@ test('inserts, draws, reopens, edits, and persists an editable drawing block', a
 	await expect(canvas.locator('ellipse')).toHaveCount(1);
 
 	await page.getByRole('button', { name: 'Eraser' }).click();
+	await dialog.getByRole('slider', { name: 'Size' }).fill('72');
 	await page.mouse.click(bounds.x + bounds.width * 0.3, bounds.y + bounds.height * 0.66);
-	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(0);
-	await page.getByRole('button', { name: 'Undo drawing action' }).click();
 	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
+	await page.getByRole('button', { name: 'Undo drawing action' }).click();
+	await expect(canvas.locator('mask')).toHaveCount(0);
+	await page.mouse.move(bounds.x + bounds.width * 0.12, bounds.y + bounds.height * 0.66);
+	await page.mouse.down();
+	await page.mouse.move(bounds.x + bounds.width * 0.28, bounds.y + bounds.height * 0.66, {
+		steps: 8
+	});
+	await page.mouse.up();
+	await expect(canvas.locator('mask')).toHaveCount(4);
+	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
+	await page.getByRole('button', { name: 'Undo drawing action' }).click();
+	await expect(canvas.locator('mask')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Redo drawing action' }).click();
+	await expect(canvas.locator('mask')).toHaveCount(4);
 
 	await dialog.getByRole('button', { name: 'Done' }).click();
 	await expect(dialog).toBeHidden();
@@ -139,9 +163,11 @@ test('inserts, draws, reopens, edits, and persists an editable drawing block', a
 	await expect(drawing).toBeVisible();
 	await drawing.dblclick();
 	await expect(dialog).toBeVisible();
-	await expect(canvas.locator('path')).toHaveCount(1);
+	await expect(canvas.locator(':scope > g > path')).toHaveCount(1);
 	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
 	await expect(canvas.locator('ellipse')).toHaveCount(1);
+	await expect(canvas.getByText('Harbor label', { exact: true })).toBeVisible();
+	await expect(canvas.locator('mask')).toHaveCount(4);
 
 	await page.getByRole('button', { name: 'Straight line' }).click();
 	const reopenedBounds = await canvas.boundingBox();
@@ -158,11 +184,19 @@ test('inserts, draws, reopens, edits, and persists an editable drawing block', a
 	);
 	await page.mouse.up();
 	await expect(canvas.locator('line')).toHaveCount(1);
+	await page.getByRole('button', { name: 'Text', exact: true }).click();
+	await canvas.getByText('Harbor label', { exact: true }).click();
+	await expect(textInput).toHaveValue('Harbor label');
+	await textInput.fill('Glass Harbor');
+	await textInput.press('Enter');
+	await expect(canvas.getByText('Glass Harbor', { exact: true })).toBeVisible();
 	await dialog.getByRole('button', { name: 'Done' }).click();
 	await page.waitForTimeout(700);
 	await page.reload();
 	await drawing.dblclick();
 	await expect(canvas.locator('line')).toHaveCount(1);
+	await expect(canvas.getByText('Glass Harbor', { exact: true })).toBeVisible();
+	await expect(canvas.locator('mask')).toHaveCount(4);
 });
 
 test('anchors comment threads to edited manuscript text and persists replies', async ({ page }) => {

@@ -60,7 +60,17 @@ describe('drawing domain', () => {
 				{ x: 20, y: 300 },
 				{ x: 200, y: 300 },
 				{ stroke: '#111111', strokeWidth: 5 }
-			)
+			),
+			{
+				id: 'text-1',
+				type: 'text',
+				stroke: '#112233',
+				strokeWidth: 1,
+				x: 120,
+				y: 420,
+				text: `Harbor <script>alert('&')</script>`,
+				fontSize: 42
+			}
 		];
 
 		const svg = drawingToSvg(drawing);
@@ -69,6 +79,9 @@ describe('drawing domain', () => {
 		expect(svg).toContain('<rect x="80" y="90" width="100" height="130"');
 		expect(svg).toContain('<ellipse cx="290" cy="150" rx="50" ry="50"');
 		expect(svg).toContain('<line x1="20" y1="300" x2="200" y2="300"');
+		expect(svg).toContain(
+			'<text x="120" y="420" fill="#112233" font-family="Arial, sans-serif" font-size="42">Harbor &lt;script&gt;alert(&apos;&amp;&apos;)&lt;/script&gt;</text>'
+		);
 		expect(svg).not.toContain('<script');
 	});
 
@@ -83,6 +96,43 @@ describe('drawing domain', () => {
 		);
 		expect(path).toMatch(/^M.+Z$/);
 		expect(path).not.toContain('NaN');
+		expect(freehandSvgPath([[10, 10, 0.5]], 56)).toMatch(/^M.+Z$/);
+	});
+
+	it('partially erases earlier artwork without deleting vectors or affecting later artwork', () => {
+		const drawing = createEmptyDrawing();
+		drawing.elements = [
+			shapeFromDrag(
+				'line',
+				'before-eraser',
+				{ x: 20, y: 100 },
+				{ x: 300, y: 100 },
+				{ stroke: '#111111', strokeWidth: 12 }
+			),
+			{
+				id: 'eraser-stroke',
+				type: 'eraser',
+				strokeWidth: 48,
+				points: [
+					[150, 60, 0.5],
+					[150, 140, 0.5]
+				]
+			},
+			shapeFromDrag(
+				'line',
+				'after-eraser',
+				{ x: 20, y: 200 },
+				{ x: 300, y: 200 },
+				{ stroke: '#222222', strokeWidth: 12 }
+			)
+		];
+
+		const svg = drawingToSvg(drawing);
+		expect(svg.match(/<line /g)).toHaveLength(2);
+		expect(svg.match(/<mask /g)).toHaveLength(1);
+		expect(svg).toContain('<g mask="url(#drawing-eraser-mask-0)"><line');
+		expect(svg).toMatch(/<path d="M[^"]+" fill="black"/);
+		expect(svg).toContain('y1="200"');
 	});
 
 	it('constrains squares, circles, and straight lines from the same drag gesture', () => {
@@ -131,9 +181,21 @@ describe('drawing domain', () => {
 			{ x: 300, y: 200 },
 			{ stroke: '#000', strokeWidth: 8 }
 		);
+		const text = {
+			id: 'text',
+			type: 'text' as const,
+			stroke: '#000',
+			strokeWidth: 1,
+			x: 400,
+			y: 300,
+			text: 'Harbor',
+			fontSize: 40
+		};
 
 		expect(drawingElementContainsPoint(rectangle, { x: 70, y: 60 })).toBe(true);
 		expect(drawingElementContainsPoint(line, { x: 250, y: 208 })).toBe(true);
 		expect(drawingElementContainsPoint(line, { x: 250, y: 260 })).toBe(false);
+		expect(drawingElementContainsPoint(text, { x: 450, y: 280 })).toBe(true);
+		expect(drawingElementContainsPoint(text, { x: 450, y: 360 })).toBe(false);
 	});
 });

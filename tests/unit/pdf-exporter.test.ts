@@ -79,16 +79,27 @@ describe('PDF export', () => {
 	it('renders editable drawings from their generated SVG asset', async () => {
 		const snapshot = workspace();
 		const drawingDocument = createEmptyDrawing();
-		drawingDocument.elements.push({
-			id: 'square-1',
-			type: 'rectangle',
-			stroke: '#243d33',
-			strokeWidth: 12,
-			x: 200,
-			y: 200,
-			width: 400,
-			height: 400
-		});
+		drawingDocument.elements.push(
+			{
+				id: 'square-1',
+				type: 'rectangle',
+				stroke: '#243d33',
+				strokeWidth: 12,
+				x: 200,
+				y: 200,
+				width: 400,
+				height: 400
+			},
+			{
+				id: 'eraser-1',
+				type: 'eraser',
+				strokeWidth: 48,
+				points: [
+					[180, 400, 0.5],
+					[260, 400, 0.5]
+				]
+			}
+		);
 		const drawing = createDrawingAsset(snapshot.project.id, drawingDocument);
 		drawing.id = 'drawing-1';
 		snapshot.assets = [drawing];
@@ -100,6 +111,7 @@ describe('PDF export', () => {
 		const definition = await buildPdfDefinition(snapshot);
 		const serialized = JSON.stringify(definition.content);
 		expect(serialized).toContain('<rect x=\\"200\\" y=\\"200\\" width=\\"400\\" height=\\"400\\"');
+		expect(serialized).toContain('<mask id=\\"drawing-eraser-mask-0\\"');
 		expect(serialized).toContain('"alignment":"right"');
 	});
 
