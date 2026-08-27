@@ -223,7 +223,8 @@ function blockContent(node: RichTextNode, context: PdfContext): Content[] {
 		case 'horizontalRule':
 			context.previousBlock = 'other';
 			return [{ text: '•  •  •', alignment: 'center', margin: [0, 12, 0, 12] }];
-		case 'image': {
+		case 'image':
+		case 'drawing': {
 			context.previousBlock = 'other';
 			const image = imageContent(node, context);
 			return image ? [image] : [];

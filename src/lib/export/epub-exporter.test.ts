@@ -2,6 +2,8 @@ import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { buildEpub } from './epub-exporter';
 import type { WorkspaceSnapshot } from '$lib/domain/types';
+import { createDrawingAsset } from '$lib/application/media-service';
+import { createEmptyDrawing } from '$lib/domain/drawing';
 
 function workspace(): WorkspaceSnapshot {
 	return {
@@ -50,6 +52,38 @@ describe('EPUB export', () => {
 		expect(await archive.file('OEBPS/content.opf')?.async('string')).toContain('The Test Book');
 		expect(await archive.file('OEBPS/styles/book.css')?.async('string')).toContain(
 			'text-align: justify'
+		);
+	});
+
+	it('packages editable drawing previews as SVG artwork', async () => {
+		const snapshot = workspace();
+		const drawingDocument = createEmptyDrawing();
+		drawingDocument.elements.push({
+			id: 'circle-1',
+			type: 'ellipse',
+			stroke: '#243d33',
+			strokeWidth: 10,
+			cx: 512,
+			cy: 512,
+			rx: 200,
+			ry: 200
+		});
+		const asset = createDrawingAsset(snapshot.project.id, drawingDocument);
+		asset.id = 'drawing-1';
+		snapshot.assets = [asset];
+		snapshot.documents[0].body.content?.push({
+			type: 'drawing',
+			attrs: { assetId: asset.id, alt: 'A circular map', alignment: 'center', width: 420 }
+		});
+
+		const archive = await JSZip.loadAsync(await buildEpub(snapshot));
+		const chapter = await archive.file('OEBPS/text/chapter-1.xhtml')?.async('string');
+		const svg = await archive.file('OEBPS/images/drawing-1.svg')?.async('string');
+
+		expect(chapter).toContain('../images/drawing-1.svg');
+		expect(svg).toContain('<ellipse');
+		expect(await archive.file('OEBPS/content.opf')?.async('string')).toContain(
+			'media-type="image/svg+xml"'
 		);
 	});
 });

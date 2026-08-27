@@ -4,6 +4,8 @@ import { LibraryService } from './library-service';
 import { SyncService } from './sync-service';
 import { createManuscriptDocument, createNovelProject } from '$lib/domain/factories';
 import type { PendingChange } from '$lib/domain/types';
+import { createDrawingAsset } from './media-service';
+import { createEmptyDrawing } from '$lib/domain/drawing';
 import { WriteANovelDatabase } from '$lib/infrastructure/local/database';
 import { LocalLibraryRepository } from '$lib/infrastructure/local/local-library-repository';
 
@@ -81,6 +83,18 @@ describe('storage routing', () => {
 			position: 1_000
 		});
 		await service.createProject(project, chapter);
+		const drawing = createEmptyDrawing();
+		drawing.elements.push({
+			id: 'line-1',
+			type: 'line',
+			stroke: '#243d33',
+			strokeWidth: 12,
+			x1: 20,
+			y1: 20,
+			x2: 200,
+			y2: 200
+		});
+		await service.saveAsset(createDrawingAsset(project.id, drawing));
 		service.configureUser({
 			id: 'user-1',
 			email: 'writer@example.test',
@@ -89,6 +103,14 @@ describe('storage routing', () => {
 		});
 
 		await service.migrateLocalProjects();
-		expect(cloud.pushes.map((item) => item.entityType).sort()).toEqual(['document', 'project']);
+		expect(cloud.pushes.map((item) => item.entityType).sort()).toEqual([
+			'asset',
+			'document',
+			'project'
+		]);
+		const pushedDrawing = cloud.pushes.find((item) => item.entityType === 'asset');
+		expect(
+			pushedDrawing?.entityType === 'asset' && pushedDrawing.data.drawing?.elements
+		).toHaveLength(1);
 	});
 });

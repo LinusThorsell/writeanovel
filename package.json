@@ -32,6 +32,7 @@
 		"dexie": "^4.4.5",
 		"jszip": "^3.10.1",
 		"pdfmake": "^0.3.11",
+		"perfect-freehand": "^1.2.3",
 		"pocketbase": "^0.28.0"
 	},
 	"devDependencies": {

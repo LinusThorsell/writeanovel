@@ -179,6 +179,9 @@
 						onCommentsChange={(body, comments) =>
 							model.updateDocumentComments(model.activeDocument!.id, body, comments)}
 						onAddMedia={(file) => model.addMedia(file)}
+						onAddDrawing={() => model.addDrawing()}
+						onUpdateDrawing={(assetId, drawing) => model.updateDrawing(assetId, drawing)}
+						getDrawing={(assetId) => model.drawing(assetId)}
 						onError={(message) => model.showError(message)}
 					/>
 				{/key}
@@ -203,6 +206,9 @@
 						onCommentsChange={(body, comments) =>
 							model.updateNoteComments(model.activeNote!.id, body, comments)}
 						onAddMedia={(file) => model.addMedia(file)}
+						onAddDrawing={() => model.addDrawing()}
+						onUpdateDrawing={(assetId, drawing) => model.updateDrawing(assetId, drawing)}
+						getDrawing={(assetId) => model.drawing(assetId)}
 						onError={(message) => model.showError(message)}
 					/>
 				{/key}

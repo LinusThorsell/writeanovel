@@ -17,6 +17,54 @@ export type RichTextNode = {
 	text?: string;
 };
 
+export type DrawingPoint = [x: number, y: number, pressure: number];
+
+type DrawingElementStyle = {
+	id: string;
+	stroke: string;
+	strokeWidth: number;
+};
+
+export type FreehandDrawingElement = DrawingElementStyle & {
+	type: 'freehand';
+	points: DrawingPoint[];
+};
+
+export type LineDrawingElement = DrawingElementStyle & {
+	type: 'line';
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+};
+
+export type RectangleDrawingElement = DrawingElementStyle & {
+	type: 'rectangle';
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+};
+
+export type EllipseDrawingElement = DrawingElementStyle & {
+	type: 'ellipse';
+	cx: number;
+	cy: number;
+	rx: number;
+	ry: number;
+};
+
+export type DrawingElement =
+	FreehandDrawingElement | LineDrawingElement | RectangleDrawingElement | EllipseDrawingElement;
+
+export type DrawingDocument = {
+	version: 1;
+	width: number;
+	height: number;
+	background: string;
+	elements: DrawingElement[];
+};
+
 export type CommentMessage = {
 	id: string;
 	authorName: string;
@@ -128,6 +176,7 @@ export type MediaAsset = {
 	name: string;
 	mimeType: string;
 	bytes: Blob;
+	drawing?: DrawingDocument;
 	createdAt: string;
 	updatedAt: string;
 };

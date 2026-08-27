@@ -1,4 +1,5 @@
-import type { JsonObject, MediaAsset, RichTextNode } from '$lib/domain/types';
+import type { DrawingDocument, JsonObject, MediaAsset, RichTextNode } from '$lib/domain/types';
+import { drawingToSvgBlob } from '$lib/domain/drawing';
 
 export const ACCEPTED_MEDIA_TYPES = [
 	'image/jpeg',
@@ -57,6 +58,30 @@ export async function createMediaAsset(projectId: string, file: File): Promise<M
 		bytes: file,
 		createdAt: timestamp,
 		updatedAt: timestamp
+	};
+}
+
+export function createDrawingAsset(projectId: string, drawing: DrawingDocument): MediaAsset {
+	const timestamp = new Date().toISOString();
+	return {
+		id: crypto.randomUUID(),
+		projectId,
+		name: 'Drawing.svg',
+		mimeType: 'image/svg+xml',
+		bytes: drawingToSvgBlob(drawing),
+		drawing: structuredClone(drawing),
+		createdAt: timestamp,
+		updatedAt: timestamp
+	};
+}
+
+export function updateDrawingAsset(asset: MediaAsset, drawing: DrawingDocument): MediaAsset {
+	if (!asset.drawing) throw new Error('That picture is not an editable drawing.');
+	return {
+		...asset,
+		bytes: drawingToSvgBlob(drawing),
+		drawing: structuredClone(drawing),
+		updatedAt: new Date().toISOString()
 	};
 }
 

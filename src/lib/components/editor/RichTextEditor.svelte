@@ -19,6 +19,7 @@
 		Quote,
 		Redo2,
 		Send,
+		Shapes,
 		Strikethrough,
 		Trash2,
 		Underline,
@@ -34,7 +35,13 @@
 		hydrateAssetSources,
 		removeTransientAssetSources
 	} from '$lib/application/media-service';
-	import type { CommentThread, RichTextNode, TrimSize, TypographyPreset } from '$lib/domain/types';
+	import type {
+		CommentThread,
+		DrawingDocument,
+		RichTextNode,
+		TrimSize,
+		TypographyPreset
+	} from '$lib/domain/types';
 	import {
 		commentAnchorSnapshots,
 		formatCommentQuote,
@@ -48,6 +55,7 @@
 		bookTypographyStyle,
 		type TypesetDocumentHeading
 	} from '$lib/typesetting/book-style';
+	import DrawingEditorModal from './DrawingEditorModal.svelte';
 
 	type Props = {
 		body: RichTextNode;
@@ -68,6 +76,9 @@
 		onPreviewPdf: (anchorText: string) => Promise<void>;
 		onTitleCommit: (title: string) => void;
 		onAddMedia: (file: File) => Promise<MediaInsertion>;
+		onAddDrawing: () => Promise<MediaInsertion>;
+		onUpdateDrawing: (assetId: string, drawing: DrawingDocument) => Promise<MediaInsertion>;
+		getDrawing: (assetId: string) => DrawingDocument | undefined;
 		onError: (message: string) => void;
 	};
 
@@ -90,6 +101,9 @@
 		onPreviewPdf,
 		onTitleCommit,
 		onAddMedia,
+		onAddDrawing,
+		onUpdateDrawing,
+		getDrawing,
 		onError
 	}: Props = $props();
 
@@ -108,6 +122,8 @@
 	let pendingComment = $state.raw<{ from: number; to: number; quotedText: string }>();
 	let newCommentText = $state('');
 	let replyText = $state('');
+	let editingDrawing = $state.raw<{ assetId: string; drawing: DrawingDocument }>();
+	let drawingSaving = $state(false);
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
 	let skipNextSave = false;
 	const typographyStyle = $derived(bookTypographyStyle(typography));
@@ -213,6 +229,14 @@
 					replyText = '';
 					commentPanelOpen = true;
 					return false;
+				},
+				handleDoubleClick: (_view, _position, event) => {
+					if (!(event.target instanceof Element)) return false;
+					const drawing = event.target.closest<HTMLElement>('[data-drawing-asset-id]');
+					const assetId = drawing?.dataset.drawingAssetId;
+					if (!assetId) return false;
+					openDrawing(assetId);
+					return true;
 				}
 			},
 			onTransaction: ({ transaction }) => {
@@ -318,6 +342,81 @@
 
 	function alignImage(alignment: 'left' | 'center' | 'right'): void {
 		editor?.chain().focus().updateAttributes('image', { alignment }).run();
+	}
+
+	function selectedDrawingAssetId(): string | undefined {
+		revision;
+		if (!editor?.isActive('drawing')) return undefined;
+		const value = editor.getAttributes('drawing').assetId;
+		return typeof value === 'string' ? value : undefined;
+	}
+
+	function openDrawing(assetId: string): void {
+		const drawing = getDrawing(assetId);
+		if (!drawing) {
+			onError('That drawing is no longer available.');
+			return;
+		}
+		editingDrawing = { assetId, drawing };
+	}
+
+	async function insertDrawing(): Promise<void> {
+		if (!editor) return;
+		try {
+			const inserted = await onAddDrawing();
+			editor
+				.chain()
+				.focus()
+				.insertContent({
+					type: 'drawing',
+					attrs: {
+						src: inserted.url,
+						assetId: inserted.assetId,
+						alt: 'Editable drawing',
+						title: 'Double-click to edit this drawing',
+						alignment: 'center',
+						width: 420,
+						height: 420
+					}
+				})
+				.run();
+			openDrawing(inserted.assetId);
+		} catch (error) {
+			onError(error instanceof Error ? error.message : 'The drawing could not be added.');
+		}
+	}
+
+	function editSelectedDrawing(): void {
+		const assetId = selectedDrawingAssetId();
+		if (assetId) openDrawing(assetId);
+	}
+
+	function alignDrawing(alignment: 'left' | 'center' | 'right'): void {
+		editor?.chain().focus().updateAttributes('drawing', { alignment }).run();
+	}
+
+	function updateDrawingSources(assetId: string, src: string): void {
+		if (!editor) return;
+		let transaction = editor.state.tr;
+		editor.state.doc.descendants((node, position) => {
+			if (node.type.name !== 'drawing' || node.attrs.assetId !== assetId) return;
+			transaction = transaction.setNodeMarkup(position, undefined, { ...node.attrs, src });
+		});
+		if (transaction.docChanged) editor.view.dispatch(transaction);
+	}
+
+	async function saveDrawing(drawing: DrawingDocument): Promise<void> {
+		if (!editingDrawing) return;
+		drawingSaving = true;
+		try {
+			const updated = await onUpdateDrawing(editingDrawing.assetId, drawing);
+			updateDrawingSources(updated.assetId, updated.url);
+			editingDrawing = undefined;
+		} catch (error) {
+			onError(error instanceof Error ? error.message : 'The drawing could not be saved.');
+		} finally {
+			drawingSaving = false;
+		}
 	}
 
 	function hasTextSelection(): boolean {
@@ -762,6 +861,9 @@
 		<button type="button" aria-label="Add a picture" onclick={() => mediaInput?.click()}
 			><ImagePlus size={18} /></button
 		>
+		<button type="button" aria-label="Insert drawing" onclick={insertDrawing}
+			><Shapes size={18} /></button
+		>
 		<input
 			class="screen-reader-only"
 			{@attach captureMediaInput}
@@ -835,6 +937,25 @@
 				><AlignRight size={17} /></button
 			>
 			<small>Drag a corner to resize</small>
+		</div>
+	{/if}
+
+	{#if isActive('drawing')}
+		<div class="image-toolbar" aria-label="Drawing options">
+			<span>Drawing</span>
+			<button type="button" class="edit-drawing-button" onclick={editSelectedDrawing}
+				><Shapes size={16} />Edit drawing</button
+			>
+			<button type="button" aria-label="Align drawing left" onclick={() => alignDrawing('left')}
+				><AlignLeft size={17} /></button
+			>
+			<button type="button" aria-label="Center drawing" onclick={() => alignDrawing('center')}
+				><AlignCenter size={17} /></button
+			>
+			<button type="button" aria-label="Align drawing right" onclick={() => alignDrawing('right')}
+				><AlignRight size={17} /></button
+			>
+			<small>Double-click to edit · Drag a corner to resize</small>
 		</div>
 	{/if}
 
@@ -1012,6 +1133,17 @@
 	</div>
 </div>
 
+{#if editingDrawing}
+	<DrawingEditorModal
+		drawing={editingDrawing.drawing}
+		saving={drawingSaving}
+		onSave={saveDrawing}
+		onClose={() => {
+			if (!drawingSaving) editingDrawing = undefined;
+		}}
+	/>
+{/if}
+
 <style>
 	.editor-shell {
 		--focus-topbar-height: calc(3.25rem + var(--safe-area-top, env(safe-area-inset-top)));
@@ -1111,6 +1243,15 @@
 		background: transparent;
 		border: 0;
 		border-radius: 0.42rem;
+	}
+
+	.image-toolbar .edit-drawing-button {
+		display: inline-flex;
+		width: auto;
+		gap: 0.35rem;
+		padding: 0 0.6rem;
+		font-size: 0.72rem;
+		font-weight: 750;
 	}
 
 	.toolbar button:hover,

@@ -12,6 +12,7 @@ import type {
 	ChapterHeadingSettings,
 	CommentThread,
 	CoverPosition,
+	DrawingDocument,
 	PageNumberingSettings,
 	DocumentKind,
 	ManuscriptDocument,
@@ -26,7 +27,14 @@ import type {
 	TypographyPreset,
 	WorkspaceSnapshot
 } from '$lib/domain/types';
-import { createAssetUrls, createMediaAsset, revokeAssetUrls } from './media-service';
+import {
+	createAssetUrls,
+	createDrawingAsset,
+	createMediaAsset,
+	revokeAssetUrls,
+	updateDrawingAsset
+} from './media-service';
+import { createEmptyDrawing } from '$lib/domain/drawing';
 
 export type MediaInsertion = {
 	assetId: string;
@@ -361,6 +369,39 @@ export class WriteANovelState {
 		this.assetUrls = new Map(this.assetUrls).set(asset.id, url);
 		this.workspace = { ...this.workspace, assets: [...this.workspace.assets, asset] };
 		return { assetId: asset.id, url, name: asset.name };
+	}
+
+	async addDrawing(): Promise<MediaInsertion> {
+		if (!this.workspace) throw new Error('Open a novel before adding a drawing.');
+		const asset = createDrawingAsset(this.workspace.project.id, createEmptyDrawing());
+		await this.library.saveAsset(asset);
+		const url = URL.createObjectURL(asset.bytes);
+		this.assetUrls = new Map(this.assetUrls).set(asset.id, url);
+		this.workspace = { ...this.workspace, assets: [...this.workspace.assets, asset] };
+		return { assetId: asset.id, url, name: asset.name };
+	}
+
+	drawing(assetId: string): DrawingDocument | undefined {
+		const drawing = this.workspace?.assets.find((asset) => asset.id === assetId)?.drawing;
+		return drawing ? structuredClone(drawing) : undefined;
+	}
+
+	async updateDrawing(assetId: string, drawing: DrawingDocument): Promise<MediaInsertion> {
+		if (!this.workspace) throw new Error('Open a novel before editing a drawing.');
+		const existing = this.workspace.assets.find((asset) => asset.id === assetId);
+		if (!existing) throw new Error('That drawing is no longer available.');
+		const updated = updateDrawingAsset(existing, drawing);
+		await this.library.saveAsset(updated);
+
+		const previousUrl = this.assetUrls.get(assetId);
+		if (previousUrl) URL.revokeObjectURL(previousUrl);
+		const url = URL.createObjectURL(updated.bytes);
+		this.assetUrls = new Map(this.assetUrls).set(assetId, url);
+		this.workspace = {
+			...this.workspace,
+			assets: this.workspace.assets.map((asset) => (asset.id === assetId ? updated : asset))
+		};
+		return { assetId, url, name: updated.name };
 	}
 
 	async setCover(side: 'front' | 'back', file: File): Promise<void> {

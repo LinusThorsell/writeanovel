@@ -73,6 +73,98 @@ test('creates, orders, writes, and persists a multi-file novel locally', async (
 	await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 });
 
+test('inserts, draws, reopens, edits, and persists an editable drawing block', async ({ page }) => {
+	await createNovel(page, 'The Drawn Harbor');
+	await page.getByRole('button', { name: 'Add places' }).click();
+	await expect(page.getByLabel('Page title')).toHaveValue('New place');
+	await page.getByLabel('Page title').fill('Glass Harbor');
+	await page.getByLabel('Page title').press('Enter');
+
+	await page.getByRole('button', { name: 'Insert drawing' }).click();
+	const dialog = page.getByRole('dialog', { name: 'Edit drawing' });
+	const canvas = page.getByRole('application', { name: 'Drawing canvas' });
+	await expect(dialog).toBeVisible();
+	await expect(canvas).toBeVisible();
+
+	const bounds = await canvas.boundingBox();
+	if (!bounds) throw new Error('The drawing canvas was not measurable.');
+	await page.mouse.move(bounds.x + bounds.width * 0.2, bounds.y + bounds.height * 0.25);
+	await page.mouse.down();
+	await page.mouse.move(bounds.x + bounds.width * 0.45, bounds.y + bounds.height * 0.4, {
+		steps: 8
+	});
+	await page.mouse.move(bounds.x + bounds.width * 0.7, bounds.y + bounds.height * 0.28, {
+		steps: 8
+	});
+	await page.mouse.up();
+	await expect(canvas.locator('path')).toHaveCount(1);
+	await page.getByRole('button', { name: 'Undo drawing action' }).click();
+	await expect(canvas.locator('path')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Redo drawing action' }).click();
+	await expect(canvas.locator('path')).toHaveCount(1);
+
+	await page.getByRole('button', { name: 'Rectangle or square' }).click();
+	await page.mouse.move(bounds.x + bounds.width * 0.18, bounds.y + bounds.height * 0.55);
+	await page.mouse.down();
+	await page.mouse.move(bounds.x + bounds.width * 0.42, bounds.y + bounds.height * 0.78, {
+		steps: 5
+	});
+	await page.mouse.up();
+	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
+
+	await page.getByRole('button', { name: 'Ellipse or circle' }).click();
+	await page.mouse.move(bounds.x + bounds.width * 0.56, bounds.y + bounds.height * 0.52);
+	await page.mouse.down();
+	await page.mouse.move(bounds.x + bounds.width * 0.82, bounds.y + bounds.height * 0.78, {
+		steps: 5
+	});
+	await page.mouse.up();
+	await expect(canvas.locator('ellipse')).toHaveCount(1);
+
+	await page.getByRole('button', { name: 'Eraser' }).click();
+	await page.mouse.click(bounds.x + bounds.width * 0.3, bounds.y + bounds.height * 0.66);
+	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Undo drawing action' }).click();
+	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
+
+	await dialog.getByRole('button', { name: 'Done' }).click();
+	await expect(dialog).toBeHidden();
+	const drawing = page.locator('.writing-surface img[data-drawing-asset-id]');
+	await expect(drawing).toBeVisible();
+	await expect(drawing).toHaveAttribute('alt', 'Editable drawing');
+	await page.waitForTimeout(700);
+
+	await page.reload();
+	await expect(page.getByLabel('Page title')).toHaveValue('Glass Harbor');
+	await expect(drawing).toBeVisible();
+	await drawing.dblclick();
+	await expect(dialog).toBeVisible();
+	await expect(canvas.locator('path')).toHaveCount(1);
+	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
+	await expect(canvas.locator('ellipse')).toHaveCount(1);
+
+	await page.getByRole('button', { name: 'Straight line' }).click();
+	const reopenedBounds = await canvas.boundingBox();
+	if (!reopenedBounds) throw new Error('The reopened drawing canvas was not measurable.');
+	await page.mouse.move(
+		reopenedBounds.x + reopenedBounds.width * 0.2,
+		reopenedBounds.y + reopenedBounds.height * 0.4
+	);
+	await page.mouse.down();
+	await page.mouse.move(
+		reopenedBounds.x + reopenedBounds.width * 0.8,
+		reopenedBounds.y + reopenedBounds.height * 0.4,
+		{ steps: 6 }
+	);
+	await page.mouse.up();
+	await expect(canvas.locator('line')).toHaveCount(1);
+	await dialog.getByRole('button', { name: 'Done' }).click();
+	await page.waitForTimeout(700);
+	await page.reload();
+	await drawing.dblclick();
+	await expect(canvas.locator('line')).toHaveCount(1);
+});
+
 test('anchors comment threads to edited manuscript text and persists replies', async ({ page }) => {
 	await createNovel(page, 'Commented Story');
 	const editor = page.locator('.writing-surface');

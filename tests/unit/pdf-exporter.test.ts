@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ContentImage, ContentSection, ContentSvg } from 'pdfmake/interfaces';
 import type { WorkspaceSnapshot } from '$lib/domain/types';
 import { buildPdfDefinition } from '$lib/export/pdf-exporter';
+import { createDrawingAsset } from '$lib/application/media-service';
+import { createEmptyDrawing } from '$lib/domain/drawing';
 
 function workspace(): WorkspaceSnapshot {
 	return {
@@ -74,6 +76,33 @@ function textAlignment(value: unknown, text: string): string | undefined {
 }
 
 describe('PDF export', () => {
+	it('renders editable drawings from their generated SVG asset', async () => {
+		const snapshot = workspace();
+		const drawingDocument = createEmptyDrawing();
+		drawingDocument.elements.push({
+			id: 'square-1',
+			type: 'rectangle',
+			stroke: '#243d33',
+			strokeWidth: 12,
+			x: 200,
+			y: 200,
+			width: 400,
+			height: 400
+		});
+		const drawing = createDrawingAsset(snapshot.project.id, drawingDocument);
+		drawing.id = 'drawing-1';
+		snapshot.assets = [drawing];
+		snapshot.documents[0].body.content?.push({
+			type: 'drawing',
+			attrs: { assetId: drawing.id, alignment: 'right', width: 360 }
+		});
+
+		const definition = await buildPdfDefinition(snapshot);
+		const serialized = JSON.stringify(definition.content);
+		expect(serialized).toContain('<rect x=\\"200\\" y=\\"200\\" width=\\"400\\" height=\\"400\\"');
+		expect(serialized).toContain('"alignment":"right"');
+	});
+
 	it('fully justifies book paragraphs even when legacy alignment metadata is present', async () => {
 		const definition = await buildPdfDefinition(workspace());
 

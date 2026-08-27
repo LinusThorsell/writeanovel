@@ -71,7 +71,8 @@ function nodeToHtml(node: RichTextNode, assetPath: AssetPathResolver): string {
 			return '<br />';
 		case 'horizontalRule':
 			return '<hr />';
-		case 'image': {
+		case 'image':
+		case 'drawing': {
 			const assetId = stringAttribute(node.attrs?.assetId);
 			if (!assetId) return '';
 			const alt = stringAttribute(node.attrs?.alt) ?? '';

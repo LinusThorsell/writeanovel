@@ -42,6 +42,7 @@ function metadataFor(asset: MediaAsset): CloudAssetMetadata {
 		projectId: asset.projectId,
 		name: asset.name,
 		mimeType: asset.mimeType,
+		...(asset.drawing ? { drawing: asset.drawing } : {}),
 		createdAt: asset.createdAt,
 		updatedAt: asset.updatedAt
 	};
