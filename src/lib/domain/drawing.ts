@@ -6,7 +6,8 @@ import type {
 	EllipseDrawingElement,
 	EraserDrawingElement,
 	LineDrawingElement,
-	RectangleDrawingElement
+	RectangleDrawingElement,
+	RegionMoveDrawingElement
 } from './types';
 
 export const DRAWING_SIZE = 1_024;
@@ -20,7 +21,27 @@ type DrawingStyle = {
 	strokeWidth: number;
 };
 
-type DrawingPosition = { x: number; y: number };
+export type DrawingPosition = { x: number; y: number };
+export type DrawingBounds = DrawingPosition & { width: number; height: number };
+export type DrawableDrawingElement = Exclude<
+	DrawingElement,
+	EraserDrawingElement | RegionMoveDrawingElement
+>;
+
+export type DrawingRenderStage = {
+	index: number;
+	inputId: string;
+	outputId: string;
+	previousStateId?: string;
+	drawables: DrawableDrawingElement[];
+	operation: EraserDrawingElement | RegionMoveDrawingElement;
+};
+
+export type DrawingRenderPlan = {
+	stages: DrawingRenderStage[];
+	finalStateId?: string;
+	finalDrawables: DrawableDrawingElement[];
+};
 
 function rounded(value: number, precision = 2): number {
 	const multiplier = 10 ** precision;
@@ -76,7 +97,7 @@ export function freehandSvgPath(points: DrawingPoint[], strokeWidth: number): st
 	return `${path}Z`;
 }
 
-function elementSvg(element: DrawingElement): string {
+function elementSvg(element: DrawableDrawingElement): string {
 	const strokeWidth = rounded(element.strokeWidth);
 	switch (element.type) {
 		case 'freehand':
@@ -89,51 +110,85 @@ function elementSvg(element: DrawingElement): string {
 			return `<ellipse cx="${rounded(element.cx)}" cy="${rounded(element.cy)}" rx="${rounded(element.rx)}" ry="${rounded(element.ry)}" fill="none" stroke="${escapeXml(element.stroke)}" stroke-width="${strokeWidth}" />`;
 		case 'text':
 			return `<text x="${rounded(element.x)}" y="${rounded(element.y)}" fill="${escapeXml(element.stroke)}" font-family="Arial, sans-serif" font-size="${rounded(element.fontSize)}">${escapeXml(element.text)}</text>`;
-		case 'eraser':
-			return '';
 	}
 }
 
-function eraserMaskSvg(
-	id: string,
-	erasers: EraserDrawingElement[],
-	width: number,
-	height: number
-): string {
+export function drawingRenderPlan(elements: DrawingElement[]): DrawingRenderPlan {
+	const stages: DrawingRenderStage[] = [];
+	let drawables: DrawableDrawingElement[] = [];
+	let previousStateId: string | undefined;
+
+	for (const element of elements) {
+		if (element.type !== 'eraser' && element.type !== 'region-move') {
+			drawables.push(element);
+			continue;
+		}
+
+		const index = stages.length;
+		const outputId = `drawing-state-${index}`;
+		stages.push({
+			index,
+			inputId: `drawing-state-input-${index}`,
+			outputId,
+			previousStateId,
+			drawables,
+			operation: element
+		});
+		previousStateId = outputId;
+		drawables = [];
+	}
+
+	return { stages, finalStateId: previousStateId, finalDrawables: drawables };
+}
+
+function renderStage(stage: DrawingRenderStage, width: number, height: number): string {
+	const priorArtwork = [
+		stage.previousStateId ? `<use href="#${stage.previousStateId}" />` : '',
+		...stage.drawables.map(elementSvg)
+	].join('');
+	const input = `<g id="${stage.inputId}">${priorArtwork}</g>`;
+
+	if (stage.operation.type === 'eraser') {
+		const maskId = `drawing-eraser-mask-${stage.index}`;
+		return [
+			input,
+			`<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${rounded(width)}" height="${rounded(height)}" style="mask-type:luminance">`,
+			'<rect width="100%" height="100%" fill="white" />',
+			`<path d="${freehandSvgPath(stage.operation.points, stage.operation.strokeWidth)}" fill="black" />`,
+			'</mask>',
+			`<g id="${stage.outputId}" mask="url(#${maskId})"><use href="#${stage.inputId}" /></g>`
+		].join('');
+	}
+
+	const operation = stage.operation;
+	const cutMaskId = `drawing-region-cut-${stage.index}`;
+	const clipId = `drawing-region-clip-${stage.index}`;
 	return [
-		`<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${rounded(width)}" height="${rounded(height)}" style="mask-type:luminance">`,
-		`<rect width="100%" height="100%" fill="white" />`,
-		...erasers.map(
-			(eraser) => `<path d="${freehandSvgPath(eraser.points, eraser.strokeWidth)}" fill="black" />`
-		),
-		'</mask>'
+		input,
+		`<mask id="${cutMaskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${rounded(width)}" height="${rounded(height)}" style="mask-type:luminance">`,
+		'<rect width="100%" height="100%" fill="white" />',
+		`<rect x="${rounded(operation.x)}" y="${rounded(operation.y)}" width="${rounded(operation.width)}" height="${rounded(operation.height)}" fill="black" />`,
+		'</mask>',
+		`<clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><rect x="${rounded(operation.x)}" y="${rounded(operation.y)}" width="${rounded(operation.width)}" height="${rounded(operation.height)}" /></clipPath>`,
+		`<g id="${stage.outputId}">`,
+		`<g mask="url(#${cutMaskId})"><use href="#${stage.inputId}" /></g>`,
+		`<g transform="translate(${rounded(operation.dx)} ${rounded(operation.dy)})"><g clip-path="url(#${clipId})"><use href="#${stage.inputId}" /></g></g>`,
+		'</g>'
 	].join('');
 }
 
 export function drawingToSvg(drawing: DrawingDocument): string {
 	const width = Math.max(1, drawing.width);
 	const height = Math.max(1, drawing.height);
-	const masks: string[] = [];
-	const content: string[] = [];
-	drawing.elements.forEach((element, index) => {
-		if (element.type === 'eraser') return;
-		const erasers = drawing.elements
-			.slice(index + 1)
-			.filter((candidate): candidate is EraserDrawingElement => candidate.type === 'eraser');
-		const svg = elementSvg(element);
-		if (erasers.length === 0) {
-			content.push(svg);
-			return;
-		}
-		const maskId = `drawing-eraser-mask-${index}`;
-		masks.push(eraserMaskSvg(maskId, erasers, width, height));
-		content.push(`<g mask="url(#${maskId})">${svg}</g>`);
-	});
+	const plan = drawingRenderPlan(drawing.elements);
 	return [
 		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${rounded(width)} ${rounded(height)}" width="${rounded(width)}" height="${rounded(height)}">`,
 		`<rect width="100%" height="100%" fill="${escapeXml(drawing.background)}" />`,
-		...(masks.length > 0 ? [`<defs>${masks.join('')}</defs>`] : []),
-		...content,
+		...(plan.stages.length > 0
+			? [`<defs>${plan.stages.map((stage) => renderStage(stage, width, height)).join('')}</defs>`]
+			: []),
+		...(plan.finalStateId ? [`<use href="#${plan.finalStateId}" />`] : []),
+		...plan.finalDrawables.map(elementSvg),
 		'</svg>'
 	].join('');
 }
@@ -211,15 +266,166 @@ function distanceToSegment(
 	return Math.hypot(point.x - (start.x + ratio * deltaX), point.y - (start.y + ratio * deltaY));
 }
 
+export function drawingBoundsFromPoints(
+	start: DrawingPosition,
+	end: DrawingPosition
+): DrawingBounds {
+	return {
+		x: Math.min(start.x, end.x),
+		y: Math.min(start.y, end.y),
+		width: Math.abs(end.x - start.x),
+		height: Math.abs(end.y - start.y)
+	};
+}
+
+export function drawingBoundsContainsPoint(bounds: DrawingBounds, point: DrawingPosition): boolean {
+	return (
+		point.x >= bounds.x &&
+		point.x <= bounds.x + bounds.width &&
+		point.y >= bounds.y &&
+		point.y <= bounds.y + bounds.height
+	);
+}
+
+export function drawingBoundsIntersect(left: DrawingBounds, right: DrawingBounds): boolean {
+	return (
+		left.x <= right.x + right.width &&
+		left.x + left.width >= right.x &&
+		left.y <= right.y + right.height &&
+		left.y + left.height >= right.y
+	);
+}
+
+export function drawingElementBounds(element: DrawingElement): DrawingBounds | undefined {
+	const padding = 'strokeWidth' in element ? element.strokeWidth / 2 : 0;
+	switch (element.type) {
+		case 'freehand': {
+			if (element.points.length === 0) return undefined;
+			const xs = element.points.map((point) => point[0]);
+			const ys = element.points.map((point) => point[1]);
+			const x = Math.min(...xs) - padding;
+			const y = Math.min(...ys) - padding;
+			return {
+				x,
+				y,
+				width: Math.max(...xs) + padding - x,
+				height: Math.max(...ys) + padding - y
+			};
+		}
+		case 'line': {
+			const x = Math.min(element.x1, element.x2) - padding;
+			const y = Math.min(element.y1, element.y2) - padding;
+			return {
+				x,
+				y,
+				width: Math.max(element.x1, element.x2) + padding - x,
+				height: Math.max(element.y1, element.y2) + padding - y
+			};
+		}
+		case 'rectangle':
+			return {
+				x: element.x - padding,
+				y: element.y - padding,
+				width: element.width + padding * 2,
+				height: element.height + padding * 2
+			};
+		case 'ellipse':
+			return {
+				x: element.cx - element.rx - padding,
+				y: element.cy - element.ry - padding,
+				width: element.rx * 2 + padding * 2,
+				height: element.ry * 2 + padding * 2
+			};
+		case 'text':
+			return {
+				x: element.x,
+				y: element.y - element.fontSize,
+				width: Math.max(element.fontSize * 0.6, [...element.text].length * element.fontSize * 0.6),
+				height: element.fontSize * 1.25
+			};
+		case 'eraser':
+		case 'region-move':
+			return undefined;
+	}
+}
+
+export function drawingOperationBounds(element: DrawingElement): DrawingBounds | undefined {
+	if (element.type === 'region-move') {
+		return { x: element.x, y: element.y, width: element.width, height: element.height };
+	}
+	if (element.type !== 'eraser' || element.points.length === 0) return undefined;
+	const padding = element.strokeWidth / 2;
+	const xs = element.points.map((point) => point[0]);
+	const ys = element.points.map((point) => point[1]);
+	const x = Math.min(...xs) - padding;
+	const y = Math.min(...ys) - padding;
+	return {
+		x,
+		y,
+		width: Math.max(...xs) + padding - x,
+		height: Math.max(...ys) + padding - y
+	};
+}
+
+export function translateDrawingElement(
+	element: DrawingElement,
+	dx: number,
+	dy: number
+): DrawingElement {
+	switch (element.type) {
+		case 'freehand':
+			return {
+				...element,
+				points: element.points.map(([x, y, pressure]) => [x + dx, y + dy, pressure])
+			};
+		case 'line':
+			return {
+				...element,
+				x1: element.x1 + dx,
+				y1: element.y1 + dy,
+				x2: element.x2 + dx,
+				y2: element.y2 + dy
+			};
+		case 'rectangle':
+			return { ...element, x: element.x + dx, y: element.y + dy };
+		case 'ellipse':
+			return { ...element, cx: element.cx + dx, cy: element.cy + dy };
+		case 'text':
+			return { ...element, x: element.x + dx, y: element.y + dy };
+		case 'eraser':
+		case 'region-move':
+			return element;
+	}
+}
+
+export function translateDrawingElementInStack(
+	elements: DrawingElement[],
+	elementId: string,
+	dx: number,
+	dy: number
+): DrawingElement[] {
+	const index = elements.findIndex((element) => element.id === elementId);
+	if (index < 0) return elements;
+	const translated = translateDrawingElement(elements[index], dx, dy);
+	const hasLaterCompositingOperation = elements
+		.slice(index + 1)
+		.some((element) => element.type === 'eraser' || element.type === 'region-move');
+	if (!hasLaterCompositingOperation) {
+		return elements.map((element, elementIndex) => (elementIndex === index ? translated : element));
+	}
+
+	return [...elements.slice(0, index), ...elements.slice(index + 1), translated];
+}
+
 export function drawingElementContainsPoint(
 	element: DrawingElement,
 	point: DrawingPosition,
 	tolerance = 14
 ): boolean {
-	const hitWidth = tolerance + element.strokeWidth / 2;
 	switch (element.type) {
 		case 'freehand':
-		case 'eraser':
+		case 'eraser': {
+			const hitWidth = tolerance + element.strokeWidth / 2;
 			return element.points.some((candidate, index) => {
 				const next = element.points[index + 1];
 				return next
@@ -230,7 +436,9 @@ export function drawingElementContainsPoint(
 						) <= hitWidth
 					: Math.hypot(point.x - candidate[0], point.y - candidate[1]) <= hitWidth;
 			});
-		case 'line':
+		}
+		case 'line': {
+			const hitWidth = tolerance + element.strokeWidth / 2;
 			return (
 				distanceToSegment(
 					point,
@@ -238,14 +446,18 @@ export function drawingElementContainsPoint(
 					{ x: element.x2, y: element.y2 }
 				) <= hitWidth
 			);
-		case 'rectangle':
+		}
+		case 'rectangle': {
+			const hitWidth = tolerance + element.strokeWidth / 2;
 			return (
 				point.x >= element.x - hitWidth &&
 				point.x <= element.x + element.width + hitWidth &&
 				point.y >= element.y - hitWidth &&
 				point.y <= element.y + element.height + hitWidth
 			);
+		}
 		case 'ellipse': {
+			const hitWidth = tolerance + element.strokeWidth / 2;
 			const rx = element.rx + hitWidth;
 			const ry = element.ry + hitWidth;
 			if (rx <= 0 || ry <= 0) return false;
@@ -265,5 +477,7 @@ export function drawingElementContainsPoint(
 				point.y <= element.y + element.fontSize * 0.25 + tolerance
 			);
 		}
+		case 'region-move':
+			return false;
 	}
 }

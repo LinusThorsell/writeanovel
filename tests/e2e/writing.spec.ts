@@ -97,11 +97,12 @@ test('inserts, draws, reopens, edits, and persists an editable drawing block', a
 		steps: 8
 	});
 	await page.mouse.up();
-	await expect(canvas.locator(':scope > g > path')).toHaveCount(1);
+	const freehand = canvas.locator('[data-drawing-element-type="freehand"]');
+	await expect(freehand).toHaveCount(1);
 	await page.keyboard.press('Control+z');
-	await expect(canvas.locator(':scope > g > path')).toHaveCount(0);
+	await expect(freehand).toHaveCount(0);
 	await page.keyboard.press('Control+Shift+z');
-	await expect(canvas.locator(':scope > g > path')).toHaveCount(1);
+	await expect(freehand).toHaveCount(1);
 	await page.getByRole('button', { name: 'Text', exact: true }).click();
 	await canvas.click({ position: { x: bounds.width * 0.2, y: bounds.height * 0.48 } });
 	const textInput = page.getByLabel('Drawing text');
@@ -132,24 +133,130 @@ test('inserts, draws, reopens, edits, and persists an editable drawing block', a
 	await page.mouse.up();
 	await expect(canvas.locator('ellipse')).toHaveCount(1);
 
+	await page.getByRole('button', { name: 'Select and move' }).click();
+	const selectBounds = await canvas.boundingBox();
+	if (!selectBounds) throw new Error('The selectable drawing canvas was not measurable.');
+	const rectangle = canvas.locator('[data-drawing-element-type="rectangle"]');
+	const originalRectangleX = Number(await rectangle.getAttribute('x'));
+	await page.mouse.move(
+		selectBounds.x + selectBounds.width * 0.3,
+		selectBounds.y + selectBounds.height * 0.66
+	);
+	await page.mouse.down();
+	await page.mouse.move(
+		selectBounds.x + selectBounds.width * 0.38,
+		selectBounds.y + selectBounds.height * 0.62,
+		{ steps: 6 }
+	);
+	await page.mouse.up();
+	await expect(canvas.locator('.selection-outline')).toHaveCount(1);
+	const movedRectangleX = Number(await rectangle.getAttribute('x'));
+	expect(movedRectangleX).toBeGreaterThan(originalRectangleX + 50);
+	await page.keyboard.press('Control+z');
+	expect(Number(await rectangle.getAttribute('x'))).toBeCloseTo(originalRectangleX, 0);
+	await page.keyboard.press('Control+Shift+z');
+	expect(Number(await rectangle.getAttribute('x'))).toBeCloseTo(movedRectangleX, 0);
+
+	const ellipse = canvas.locator('[data-drawing-element-type="ellipse"]');
+	const ellipseBounds = await ellipse.boundingBox();
+	if (!ellipseBounds) throw new Error('The ellipse was not measurable for Shift-selection.');
+	const originalEllipseCx = Number(await ellipse.getAttribute('cx'));
+	const originalEllipseCy = Number(await ellipse.getAttribute('cy'));
+	await page.keyboard.down('Shift');
+	await page.mouse.move(
+		ellipseBounds.x + ellipseBounds.width * 0.98,
+		ellipseBounds.y + ellipseBounds.height * 0.5
+	);
+	await page.mouse.down();
+	await page.mouse.move(
+		ellipseBounds.x + ellipseBounds.width * 0.7,
+		ellipseBounds.y + ellipseBounds.height * 0.75,
+		{ steps: 4 }
+	);
+	await page.mouse.up();
+	await page.keyboard.up('Shift');
+	const regionSelection = canvas.locator('.selection-outline.region');
+	await expect(regionSelection).toHaveCount(1);
+	const regionBounds = await regionSelection.boundingBox();
+	if (!regionBounds) throw new Error('The rectangular drawing selection was not measurable.');
+	await page.mouse.move(
+		regionBounds.x + regionBounds.width * 0.5,
+		regionBounds.y + regionBounds.height * 0.5
+	);
+	await page.mouse.down();
+	await expect(canvas).toHaveClass(/moving/);
+	await page.mouse.move(
+		regionBounds.x + regionBounds.width * 0.5 + ellipseBounds.width * 0.45,
+		regionBounds.y + regionBounds.height * 0.5 - ellipseBounds.height * 0.25,
+		{ steps: 6 }
+	);
+	await page.mouse.up();
+	await expect(canvas.locator('[id^="drawing-region-clip-"]')).toHaveCount(1);
+	await expect(canvas.locator('mask[id^="drawing-region-cut-"]')).toHaveCount(1);
+
+	await page.mouse.move(
+		ellipseBounds.x + ellipseBounds.width * 0.02,
+		ellipseBounds.y + ellipseBounds.height * 0.5
+	);
+	await page.mouse.down();
+	await page.mouse.move(
+		ellipseBounds.x + ellipseBounds.width * 0.12,
+		ellipseBounds.y + ellipseBounds.height * 0.6,
+		{ steps: 4 }
+	);
+	await page.mouse.up();
+	await expect(regionSelection).toHaveCount(1);
+	expect(Number(await ellipse.getAttribute('cx'))).toBeCloseTo(originalEllipseCx, 5);
+	expect(Number(await ellipse.getAttribute('cy'))).toBeCloseTo(originalEllipseCy, 5);
+	await expect(canvas.locator('[id^="drawing-region-clip-"]')).toHaveCount(1);
+
+	await page.keyboard.press('Control+z');
+	await expect(canvas.locator('[id^="drawing-region-clip-"]')).toHaveCount(0);
+	await page.keyboard.press('Control+Shift+z');
+	await expect(canvas.locator('[id^="drawing-region-clip-"]')).toHaveCount(1);
+
+	const rectangleWidth = Number(await rectangle.getAttribute('width'));
+	const rectangleHeight = Number(await rectangle.getAttribute('height'));
+	const rectangleY = Number(await rectangle.getAttribute('y'));
+	const rectangleCenter = {
+		x:
+			selectBounds.x +
+			((Number(await rectangle.getAttribute('x')) + rectangleWidth / 2) / 1024) *
+				selectBounds.width,
+		y: selectBounds.y + ((rectangleY + rectangleHeight / 2) / 1024) * selectBounds.height
+	};
+	await page.mouse.move(rectangleCenter.x, rectangleCenter.y);
+	await page.mouse.down();
+	await page.mouse.move(
+		ellipseBounds.x + ellipseBounds.width * 0.84,
+		ellipseBounds.y + ellipseBounds.height * 0.625,
+		{ steps: 8 }
+	);
+	await page.mouse.up();
+	await expect(canvas.locator(':scope > rect[data-drawing-element-type="rectangle"]')).toHaveCount(
+		1
+	);
+	await expect(canvas.locator('defs rect[data-drawing-element-type="rectangle"]')).toHaveCount(0);
+	await expect(canvas.locator('[id^="drawing-region-clip-"]')).toHaveCount(1);
+
 	await page.getByRole('button', { name: 'Eraser' }).click();
 	await dialog.getByRole('slider', { name: 'Size' }).fill('72');
 	await page.mouse.click(bounds.x + bounds.width * 0.3, bounds.y + bounds.height * 0.66);
 	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
 	await page.getByRole('button', { name: 'Undo drawing action' }).click();
-	await expect(canvas.locator('mask')).toHaveCount(0);
+	await expect(canvas.locator('mask[id^="drawing-eraser-mask-"]')).toHaveCount(0);
 	await page.mouse.move(bounds.x + bounds.width * 0.12, bounds.y + bounds.height * 0.66);
 	await page.mouse.down();
 	await page.mouse.move(bounds.x + bounds.width * 0.28, bounds.y + bounds.height * 0.66, {
 		steps: 8
 	});
 	await page.mouse.up();
-	await expect(canvas.locator('mask')).toHaveCount(4);
+	await expect(canvas.locator('mask[id^="drawing-eraser-mask-"]')).toHaveCount(1);
 	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
 	await page.getByRole('button', { name: 'Undo drawing action' }).click();
-	await expect(canvas.locator('mask')).toHaveCount(0);
+	await expect(canvas.locator('mask[id^="drawing-eraser-mask-"]')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Redo drawing action' }).click();
-	await expect(canvas.locator('mask')).toHaveCount(4);
+	await expect(canvas.locator('mask[id^="drawing-eraser-mask-"]')).toHaveCount(1);
 
 	await dialog.getByRole('button', { name: 'Done' }).click();
 	await expect(dialog).toBeHidden();
@@ -163,11 +270,13 @@ test('inserts, draws, reopens, edits, and persists an editable drawing block', a
 	await expect(drawing).toBeVisible();
 	await drawing.dblclick();
 	await expect(dialog).toBeVisible();
-	await expect(canvas.locator(':scope > g > path')).toHaveCount(1);
+	await expect(freehand).toHaveCount(1);
 	await expect(canvas.locator('rect[fill="none"]')).toHaveCount(1);
 	await expect(canvas.locator('ellipse')).toHaveCount(1);
-	await expect(canvas.getByText('Harbor label', { exact: true })).toBeVisible();
-	await expect(canvas.locator('mask')).toHaveCount(4);
+	const drawingText = canvas.locator('[data-drawing-element-type="text"]');
+	await expect(drawingText).toHaveText('Harbor label');
+	await expect(canvas.locator('[id^="drawing-region-clip-"]')).toHaveCount(1);
+	await expect(canvas.locator('mask[id^="drawing-eraser-mask-"]')).toHaveCount(1);
 
 	await page.getByRole('button', { name: 'Straight line' }).click();
 	const reopenedBounds = await canvas.boundingBox();
@@ -185,18 +294,21 @@ test('inserts, draws, reopens, edits, and persists an editable drawing block', a
 	await page.mouse.up();
 	await expect(canvas.locator('line')).toHaveCount(1);
 	await page.getByRole('button', { name: 'Text', exact: true }).click();
-	await canvas.getByText('Harbor label', { exact: true }).click();
+	await canvas.click({
+		position: { x: reopenedBounds.width * 0.2, y: reopenedBounds.height * 0.48 }
+	});
 	await expect(textInput).toHaveValue('Harbor label');
 	await textInput.fill('Glass Harbor');
 	await textInput.press('Enter');
-	await expect(canvas.getByText('Glass Harbor', { exact: true })).toBeVisible();
+	await expect(drawingText).toHaveText('Glass Harbor');
 	await dialog.getByRole('button', { name: 'Done' }).click();
 	await page.waitForTimeout(700);
 	await page.reload();
 	await drawing.dblclick();
 	await expect(canvas.locator('line')).toHaveCount(1);
-	await expect(canvas.getByText('Glass Harbor', { exact: true })).toBeVisible();
-	await expect(canvas.locator('mask')).toHaveCount(4);
+	await expect(drawingText).toHaveText('Glass Harbor');
+	await expect(canvas.locator('[id^="drawing-region-clip-"]')).toHaveCount(1);
+	await expect(canvas.locator('mask[id^="drawing-eraser-mask-"]')).toHaveCount(1);
 });
 
 test('anchors comment threads to edited manuscript text and persists replies', async ({ page }) => {

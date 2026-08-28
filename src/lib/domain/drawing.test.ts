@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
 	createEmptyDrawing,
+	drawingBoundsContainsPoint,
+	drawingBoundsIntersect,
 	drawingElementContainsPoint,
+	drawingElementBounds,
 	drawingToSvg,
 	freehandSvgPath,
-	shapeFromDrag
+	shapeFromDrag,
+	translateDrawingElement,
+	translateDrawingElementInStack
 } from './drawing';
 
 describe('drawing domain', () => {
@@ -130,9 +135,86 @@ describe('drawing domain', () => {
 		const svg = drawingToSvg(drawing);
 		expect(svg.match(/<line /g)).toHaveLength(2);
 		expect(svg.match(/<mask /g)).toHaveLength(1);
-		expect(svg).toContain('<g mask="url(#drawing-eraser-mask-0)"><line');
+		expect(svg).toContain('<g id="drawing-state-input-0"><line');
+		expect(svg).toContain(
+			'<g id="drawing-state-0" mask="url(#drawing-eraser-mask-0)"><use href="#drawing-state-input-0" />'
+		);
 		expect(svg).toMatch(/<path d="M[^"]+" fill="black"/);
 		expect(svg).toContain('y1="200"');
+	});
+
+	it('cuts and translates exactly the pixels inside a rectangular selection', () => {
+		const drawing = createEmptyDrawing();
+		drawing.elements = [
+			shapeFromDrag(
+				'line',
+				'line',
+				{ x: 10, y: 100 },
+				{ x: 400, y: 100 },
+				{ stroke: '#111111', strokeWidth: 12 }
+			),
+			{
+				id: 'region-move',
+				type: 'region-move',
+				x: 100,
+				y: 50,
+				width: 120,
+				height: 100,
+				dx: 80,
+				dy: 40
+			}
+		];
+
+		const svg = drawingToSvg(drawing);
+		expect(svg).toContain('<mask id="drawing-region-cut-0"');
+		expect(svg).toContain('<rect x="100" y="50" width="120" height="100" fill="black"');
+		expect(svg).toContain('<clipPath id="drawing-region-clip-0"');
+		expect(svg).toContain('transform="translate(80 40)"');
+		expect(svg).toContain('<use href="#drawing-state-input-0" />');
+	});
+
+	it('promotes a moved object above later canvas operations', () => {
+		const rectangle = shapeFromDrag(
+			'rectangle',
+			'rect',
+			{ x: 20, y: 20 },
+			{ x: 120, y: 100 },
+			{ stroke: '#000', strokeWidth: 8 }
+		);
+		const regionMove = {
+			id: 'region-move',
+			type: 'region-move' as const,
+			x: 300,
+			y: 300,
+			width: 100,
+			height: 100,
+			dx: 100,
+			dy: 0
+		};
+		const laterLine = shapeFromDrag(
+			'line',
+			'later-line',
+			{ x: 200, y: 200 },
+			{ x: 300, y: 200 },
+			{ stroke: '#000', strokeWidth: 8 }
+		);
+
+		const moved = translateDrawingElementInStack(
+			[rectangle, regionMove, laterLine],
+			rectangle.id,
+			300,
+			300
+		);
+		expect(moved.map((element) => element.id)).toEqual([regionMove.id, laterLine.id, rectangle.id]);
+		expect(moved.at(-1)).toMatchObject({ id: rectangle.id, x: 320, y: 320 });
+
+		const withoutOperation = translateDrawingElementInStack(
+			[rectangle, laterLine],
+			rectangle.id,
+			10,
+			20
+		);
+		expect(withoutOperation.map((element) => element.id)).toEqual([rectangle.id, laterLine.id]);
 	});
 
 	it('constrains squares, circles, and straight lines from the same drag gesture', () => {
@@ -166,7 +248,7 @@ describe('drawing domain', () => {
 		expect(line.type === 'line' && line.y2).toBeCloseTo(0, 8);
 	});
 
-	it('hit-tests complete vector elements for the eraser', () => {
+	it('finds and translates individual vector objects for selection', () => {
 		const rectangle = shapeFromDrag(
 			'rectangle',
 			'rect',
@@ -197,5 +279,18 @@ describe('drawing domain', () => {
 		expect(drawingElementContainsPoint(line, { x: 250, y: 260 })).toBe(false);
 		expect(drawingElementContainsPoint(text, { x: 450, y: 280 })).toBe(true);
 		expect(drawingElementContainsPoint(text, { x: 450, y: 360 })).toBe(false);
+
+		const bounds = drawingElementBounds(rectangle);
+		expect(bounds).toEqual({ x: 16, y: 16, width: 108, height: 88 });
+		expect(bounds && drawingBoundsContainsPoint(bounds, { x: 70, y: 60 })).toBe(true);
+		expect(drawingBoundsIntersect(bounds!, { x: 110, y: 80, width: 40, height: 40 })).toBe(true);
+		expect(drawingBoundsIntersect(bounds!, { x: 200, y: 200, width: 40, height: 40 })).toBe(false);
+		expect(translateDrawingElement(rectangle, 25, -10)).toMatchObject({
+			type: 'rectangle',
+			x: 45,
+			y: 10,
+			width: 100,
+			height: 80
+		});
 	});
 });

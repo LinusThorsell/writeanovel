@@ -70,13 +70,25 @@ export type EraserDrawingElement = DrawingElementBase & {
 	points: DrawingPoint[];
 };
 
+export type RegionMoveDrawingElement = {
+	id: string;
+	type: 'region-move';
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	dx: number;
+	dy: number;
+};
+
 export type DrawingElement =
 	| FreehandDrawingElement
 	| LineDrawingElement
 	| RectangleDrawingElement
 	| EllipseDrawingElement
 	| TextDrawingElement
-	| EraserDrawingElement;
+	| EraserDrawingElement
+	| RegionMoveDrawingElement;
 
 export type DrawingDocument = {
 	version: 1;
