@@ -46,7 +46,9 @@
 			</div>
 		</div>
 
-		<nav>
+		<!-- Scrollable regions must be keyboard-focusable. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<nav aria-label="Novel sections" tabindex="0">
 			<section>
 				<div class="section-heading">
 					<span>Front pages</span>
@@ -230,8 +232,56 @@
 	}
 
 	nav {
+		min-height: 0;
+		flex: 1 1 auto;
 		padding: 0.8rem 0.55rem 4rem;
+		overflow-x: hidden;
 		overflow-y: auto;
+		overscroll-behavior-y: contain;
+		scrollbar-color: #71867c #e7e0d4;
+		scrollbar-gutter: stable;
+	}
+
+	nav:focus-visible {
+		outline: 2px solid var(--copper);
+		outline-offset: -3px;
+	}
+
+	nav::-webkit-scrollbar {
+		width: 0.8rem;
+	}
+
+	nav::-webkit-scrollbar-track {
+		background: #e7e0d4;
+		border-left: 1px solid rgb(39 72 59 / 8%);
+	}
+
+	nav::-webkit-scrollbar-thumb {
+		min-height: 2.75rem;
+		background: #71867c;
+		background-clip: padding-box;
+		border: 3px solid transparent;
+		border-radius: 999px;
+	}
+
+	nav::-webkit-scrollbar-thumb:hover {
+		background: var(--forest);
+		background-clip: padding-box;
+	}
+
+	nav::-webkit-scrollbar-thumb:active {
+		background: var(--forest-deep);
+		background-clip: padding-box;
+	}
+
+	@media (forced-colors: active) {
+		nav {
+			scrollbar-color: auto;
+		}
+
+		nav:focus-visible {
+			outline-color: CanvasText;
+		}
 	}
 
 	section {

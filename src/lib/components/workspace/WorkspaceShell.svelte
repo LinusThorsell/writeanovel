@@ -437,7 +437,12 @@
 	.sidebar,
 	.sidebar-inner {
 		min-width: 0;
+		min-height: 0;
 		height: 100%;
+	}
+
+	.sidebar {
+		overflow: hidden;
 	}
 
 	.sidebar-backdrop {
@@ -468,6 +473,7 @@
 			position: fixed;
 			z-index: 30;
 			inset: var(--topbar-height) 0 var(--safe-area-bottom);
+			height: auto;
 			visibility: hidden;
 			background: transparent;
 			opacity: 0;

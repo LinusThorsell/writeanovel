@@ -73,6 +73,68 @@ test('creates, orders, writes, and persists a multi-file novel locally', async (
 	await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 });
 
+test('keeps overflowing novel contents themed and keyboard-scrollable', async ({ page }) => {
+	await page.setViewportSize({ width: 1_100, height: 620 });
+	await createNovel(page, 'The Long Way Home');
+
+	const addChapter = page.getByRole('button', { name: 'Add chapter', exact: true });
+	for (let chapter = 0; chapter < 12; chapter += 1) await addChapter.click();
+
+	const novelSections = page.getByRole('navigation', { name: 'Novel sections' });
+	const presentation = await novelSections.evaluate((element) => {
+		const style = getComputedStyle(element);
+		return {
+			clientHeight: element.clientHeight,
+			overflowY: style.overflowY,
+			scrollbarColor: style.scrollbarColor,
+			scrollHeight: element.scrollHeight,
+			tabIndex: (element as HTMLElement).tabIndex
+		};
+	});
+
+	expect(presentation.scrollHeight).toBeGreaterThan(presentation.clientHeight);
+	expect(presentation.overflowY).toBe('auto');
+	expect(presentation.scrollbarColor).not.toBe('auto');
+	expect(presentation.tabIndex).toBe(0);
+
+	await novelSections.focus();
+	await expect(novelSections).toBeFocused();
+	await page.keyboard.press('End');
+	await expect
+		.poll(() => novelSections.evaluate((element) => element.scrollTop))
+		.toBeGreaterThan(0);
+	await expect(page.getByRole('button', { name: 'Add planning' })).toBeVisible();
+
+	await page.keyboard.press('Home');
+	await expect.poll(() => novelSections.evaluate((element) => element.scrollTop)).toBe(0);
+	await expect(page.getByLabel('Add a front page')).toBeVisible();
+
+	await page.setViewportSize({ width: 390, height: 620 });
+	await page.getByRole('button', { name: 'Open novel contents' }).click();
+	await expect(novelSections).toBeVisible();
+	const mobilePresentation = await novelSections.evaluate((element) => {
+		const sidebar = element.closest<HTMLElement>('.sidebar');
+		const bounds = sidebar?.getBoundingClientRect();
+		return {
+			bottom: bounds?.bottom ?? Number.POSITIVE_INFINITY,
+			clientHeight: element.clientHeight,
+			scrollHeight: element.scrollHeight,
+			top: bounds?.top ?? Number.NEGATIVE_INFINITY,
+			viewportHeight: window.innerHeight
+		};
+	});
+	expect(mobilePresentation.top).toBeGreaterThanOrEqual(0);
+	expect(mobilePresentation.bottom).toBeLessThanOrEqual(mobilePresentation.viewportHeight);
+	expect(mobilePresentation.scrollHeight).toBeGreaterThan(mobilePresentation.clientHeight);
+
+	await novelSections.focus();
+	await page.keyboard.press('End');
+	await expect
+		.poll(() => novelSections.evaluate((element) => element.scrollTop))
+		.toBeGreaterThan(0);
+	await expect(page.getByRole('button', { name: 'Add planning' })).toBeVisible();
+});
+
 test('inserts, draws, reopens, edits, and persists an editable drawing block', async ({ page }) => {
 	await createNovel(page, 'The Drawn Harbor');
 	await page.getByRole('button', { name: 'Add places' }).click();
