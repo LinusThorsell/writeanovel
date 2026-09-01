@@ -414,6 +414,7 @@
 		height: calc(100vh - var(--topbar-height));
 		height: calc(100dvh - var(--topbar-height));
 		grid-template-columns: 17.5rem minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr);
 		padding-bottom: var(--safe-area-bottom);
 		overflow: hidden;
 	}

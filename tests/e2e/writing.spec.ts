@@ -135,6 +135,49 @@ test('keeps overflowing novel contents themed and keyboard-scrollable', async ({
 	await expect(page.getByRole('button', { name: 'Add planning' })).toBeVisible();
 });
 
+test('keeps the standard writing workspace usable inside a short viewport', async ({ page }) => {
+	await page.setViewportSize({ width: 1_100, height: 500 });
+	await createNovel(page, 'A Windowed Story');
+
+	const editorArea = page.locator('.editor-area');
+	const writingSurface = page.locator('.writing-surface');
+	const layout = await page.evaluate(() => {
+		const editor = document.querySelector<HTMLElement>('.editor-area');
+		const main = document.querySelector<HTMLElement>('main');
+		const status = document.querySelector<HTMLElement>('.status-bar');
+		const toolbar = document.querySelector<HTMLElement>('.toolbar');
+		if (!editor || !main || !status || !toolbar) {
+			throw new Error('The standard writing workspace did not render.');
+		}
+
+		return {
+			editorBottom: editor.getBoundingClientRect().bottom,
+			editorHeight: editor.clientHeight,
+			editorOverflow: getComputedStyle(editor).overflowY,
+			editorScrollHeight: editor.scrollHeight,
+			mainBottom: main.getBoundingClientRect().bottom,
+			statusBottom: status.getBoundingClientRect().bottom,
+			toolbarTop: toolbar.getBoundingClientRect().top,
+			viewportHeight: window.innerHeight
+		};
+	});
+
+	expect(layout.mainBottom).toBeLessThanOrEqual(layout.viewportHeight);
+	expect(layout.editorBottom).toBeLessThanOrEqual(layout.viewportHeight);
+	expect(layout.statusBottom).toBeLessThanOrEqual(layout.viewportHeight);
+	expect(layout.editorHeight).toBeGreaterThan(100);
+	expect(layout.editorOverflow).toBe('auto');
+	expect(layout.editorScrollHeight).toBeGreaterThan(layout.editorHeight);
+	expect(layout.toolbarTop).toBeGreaterThanOrEqual(0);
+
+	await editorArea.hover();
+	await page.mouse.wheel(0, 700);
+	await expect.poll(() => editorArea.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+	await writingSurface.fill('Writing remains available outside focus mode.');
+	await expect(writingSurface).toContainText('Writing remains available outside focus mode.');
+	await expect(page.locator('.status-bar')).toBeVisible();
+});
+
 test('inserts, draws, reopens, edits, and persists an editable drawing block', async ({ page }) => {
 	await createNovel(page, 'The Drawn Harbor');
 	await page.getByRole('button', { name: 'Add places' }).click();
